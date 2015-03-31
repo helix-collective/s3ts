@@ -1,4 +1,5 @@
 import os, hashlib, zlib, tempfile
+import requests
 
 from s3ts.config import TreeStoreConfigJS
 from s3ts import package
@@ -25,9 +26,9 @@ class TreeStore(object):
             return cls( fileStore, localCache, config )
 
     @classmethod
-    def open( cls, filesStore, localCache ):
+    def open( cls, fileStore, localCache ):
         """opens a existing treestore"""
-        return cls( filesStore, localCache, fileStore.getFromJson( CONFIG_PATH, TreeStoreConfigJS() ) )
+        return cls( fileStore, localCache, fileStore.getFromJson( CONFIG_PATH, TreeStoreConfigJS() ) )
     
     def __init__( self, filesStore, localCache, config ):
         self.filesStore = filesStore
@@ -44,19 +45,26 @@ class TreeStore(object):
 
         pkg = package.Package( treeName, packageFiles )
         self.filesStore.putToJson( self.__treeNamePath( treeName ), pkg, package.PackageJS() )
+        return pkg
 
-    def verify( self, treeName ):
-        """confirms that the given name exists, and all data is present"""
-        pkg = self.filesStore.getFromJson( self.__treeNamePath( treeName ), package.PackageJS() )
+    def find( self, treeName ):
+        """Return the package definition for the given name"""
+        return self.filesStore.getFromJson( self.__treeNamePath( treeName ), package.PackageJS() )
+
+    def list( self ):
+        """Returns the available packages names"""
+        return self.filesStore.list( TREES_PATH )
+
+    def verify( self, pkg ):
+        """confirms that all data for the given package is present"""
         for pf in pkg.files:
             for chunk in pf.chunks:
                 cpath = self.__chunkPath( chunk.sha1, chunk.encoding ) 
                 if not self.filesStore.exists( cpath ):
                     raise RuntimeError, "{0} not found".format(cpath)
 
-    def download( self, treeName ):
+    def download( self,  pkg ):
         """downloads all data not already present to the local cache"""
-        pkg = self.filesStore.getFromJson( self.__treeNamePath( treeName ), package.PackageJS() )
         for pf in pkg.files:
             for chunk in pf.chunks:
                 cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
@@ -65,9 +73,24 @@ class TreeStore(object):
                     self.__checkSha1( self.__decompress( buf, chunk.encoding ), chunk.sha1, cpath )
                     self.localCache.put( cpath, buf )
 
-    def install( self, treeName, localPath ):
-        """installs the named tree into the local path"""
-        pkg = self.filesStore.getFromJson( self.__treeNamePath( treeName ), package.PackageJS() )
+    def downloadHttp( self, pkg ):
+        """downloads all data not already present to the local cache, using http.
+
+        This requires that pkg already has embedded urls, created with the addUrls method
+
+        """
+        for pf in pkg.files:
+            for chunk in pf.chunks:
+                cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
+                if not self.localCache.exists( cpath ):
+                    resp = requests.get( chunk.url )
+                    resp.raise_for_status()
+                    buf = resp.content
+                    self.__checkSha1( self.__decompress( buf, chunk.encoding ), chunk.sha1, cpath )
+                    self.localCache.put( cpath, buf )
+
+    def install( self, pkg, localPath ):
+        """installs the given package into the local path"""
         for pf in pkg.files:
             filesha1 = hashlib.sha1()
             with tempfile.NamedTemporaryFile(delete=False) as f:
@@ -86,9 +109,12 @@ class TreeStore(object):
                 os.makedirs( targetDir )
             os.rename( f.name, targetPath )
 
-    def list( self ):
-        """Returns the available packages names"""
-        return self.filesStore.list( TREES_PATH )
+    def addUrls( self, pkg, expiresInSecs ):
+        """Update the given package so that it can be accessed directly via pre-signed http urls"""
+        for pf in pkg.files:
+            for chunk in pf.chunks:
+                cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
+                chunk.url = self.filesStore.url( cpath, expiresInSecs )
 
     def __uploadFile( self, root, rpath ):
         filesha1 = hashlib.sha1()

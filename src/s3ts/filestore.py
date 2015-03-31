@@ -32,6 +32,8 @@ class FileStore(object):
     def putToJson( self, path, v, jscoder ):
         return self.put( path, json.dumps( jscoder.toJson(v) ) )
 
+    def url( self, path, expiresInSecs ):
+        raise RuntimeError, "Not implemented"
     
 class LocalFileStore(FileStore):
     """implements the FileStore interface using the local file system"""

@@ -39,19 +39,20 @@ class TestTreeStore(unittest.TestCase):
         
         # Upload it as a tree
         treestore.upload( 'v1.0', self.srcTree )
+        pkg = treestore.find( 'v1.0' )
 
         # Confirm it's in the index
         self.assertEquals( treestore.list(), ['v1.0'] )
 
         # Verify it
-        treestore.verify( 'v1.0' )
+        treestore.verify( pkg )
 
         # Download it
-        treestore.download( 'v1.0' )
+        treestore.download( pkg )
 
         # Install it
         destTree = os.path.join( self.workdir, 'dest-1' )
-        treestore.install( 'v1.0', destTree )
+        treestore.install( pkg, destTree )
 
         # Check that the installed tree is the same as the source tree
         self.assertEquals( subprocess.call( 'diff -r {0} {1}'.format(self.srcTree,destTree), shell=True ), 0 )
@@ -78,22 +79,41 @@ class TestTreeStore(unittest.TestCase):
         
         # Upload it as a tree
         treestore.upload( 'v1.0', self.srcTree )
+        pkg = treestore.find( 'v1.0' )
 
         # Confirm it's in the index
         self.assertEquals( treestore.list(), ['v1.0'] )
 
         # Verify it
-        treestore.verify( 'v1.0' )
+        treestore.verify( pkg )
 
         # Download it
-        treestore.download( 'v1.0' )
+        treestore.download( pkg )
 
         # Install it
         destTree = os.path.join( self.workdir, 'dest-1' )
-        treestore.install( 'v1.0', destTree )
+        treestore.install( pkg, destTree )
 
         # Check that the installed tree is the same as the source tree
         self.assertEquals( subprocess.call( 'diff -r {0} {1}'.format(self.srcTree,destTree), shell=True ), 0 )
+
+        # Now create a pre-signed version of the package
+        pkg = treestore.find( 'v1.0' )
+        treestore.addUrls( pkg, 3600 )
+
+        # And download it directly via http. Create a new local cache
+        # to ensure that we actually redownload each chunk
+        localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
+        treestore = TreeStore.open( fileStore, localCache )
+        treestore.downloadHttp( pkg )
+
+        # Install it
+        destTree2 = os.path.join( self.workdir, 'dest-2' )
+        treestore.install( pkg, destTree2 )
+        
+        # Check that the new installed tree is the same as the source tree
+        self.assertEquals( subprocess.call( 'diff -r {0} {1}'.format(self.srcTree,destTree2), shell=True ), 0 )
+        
 
 def makeEmptyDir( path ):
     if os.path.exists( path ):
