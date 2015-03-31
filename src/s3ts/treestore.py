@@ -4,6 +4,7 @@ from s3ts.config import TreeStoreConfigJS
 from s3ts import package
 
 CONFIG_PATH = 'config'
+TREES_PATH = 'trees'
 
 class TreeStore(object):
     """implements a directory tree store
@@ -17,7 +18,7 @@ class TreeStore(object):
     def create( cls, fileStore, localCache, config ):
         """creates a new treestore"""
         try:
-            fileStore.get( 'config' )
+            fileStore.get( CONFIG_PATH )
             raise RuntimeError, "treestore is already initialised"
         except KeyError:
             fileStore.putToJson( CONFIG_PATH, config, TreeStoreConfigJS() )
@@ -85,6 +86,10 @@ class TreeStore(object):
                 os.makedirs( targetDir )
             os.rename( f.name, targetPath )
 
+    def list( self ):
+        """Returns the available packages names"""
+        return self.filesStore.list( TREES_PATH )
+
     def __uploadFile( self, root, rpath ):
         filesha1 = hashlib.sha1()
         chunks = []
@@ -111,7 +116,7 @@ class TreeStore(object):
         return package.FileChunk( sha1, size, encoding, None )
 
     def __treeNamePath( self, treeName ):
-        return os.path.join( 'trees', treeName )
+        return os.path.join( TREES_PATH, treeName )
             
     def __chunkPath( self, sha1, encoding ):
         enc = {

@@ -33,7 +33,7 @@ class FileStore(object):
         return self.put( path, json.dumps( jscoder.toJson(v) ) )
 
     
-class FSFileStore(FileStore):
+class LocalFileStore(FileStore):
     """implements the FileStore interface using the local file system"""
 
     def __init__( self, root ):
@@ -63,9 +63,10 @@ class FSFileStore(FileStore):
     def list( self, pathPrefix ):
         results = []
         for dir0, dirs, files in os.walk(self.__path(pathPrefix)):
-            path = os.path.join( root, file)
-            rpath = os.path.relpath( path, self.root )
-            results.append( rpath )
+            for file in files:
+                path = os.path.join( dir0, file)
+                rpath = os.path.relpath( path, os.path.join( self.root, pathPrefix ) )
+                results.append( rpath )
         return results
             
         
