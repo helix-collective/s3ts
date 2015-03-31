@@ -1,4 +1,4 @@
-import json, os
+import json, os, tempfile
 
 class FileStore(object):
 
@@ -59,8 +59,12 @@ class LocalFileStore(FileStore):
         dir = os.path.dirname( path )
         if not os.path.isdir( dir ):
             os.makedirs( dir )
-        with open( path, 'wb' ) as f:
+
+        # Write to a unique temporary file, and then move it to the
+        # final filename, in an attempt to get atomic updates
+        with tempfile.NamedTemporaryFile( dir=os.path.dirname(path), delete=False ) as f:
             f.write(body)
+        os.rename( f.name, path )
 
     def list( self, pathPrefix ):
         results = []
