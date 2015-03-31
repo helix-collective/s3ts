@@ -1,8 +1,8 @@
 import os, tempfile, unittest, shutil, subprocess
 
-from s3m.filestore import FSFileStore
-from s3m.config import TreeStoreConfig
-from s3m.treestore import TreeStore
+from s3ts.filestore import FSFileStore
+from s3ts.config import TreeStoreConfig
+from s3ts.treestore import TreeStore
 
 class TestTreeStore(unittest.TestCase):
 

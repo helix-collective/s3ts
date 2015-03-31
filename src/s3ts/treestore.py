@@ -1,7 +1,7 @@
 import os, hashlib, zlib, tempfile
 
-from s3m.config import TreeStoreConfigJS
-from s3m import package
+from s3ts.config import TreeStoreConfigJS
+from s3ts import package
 
 CONFIG_PATH = 'config'
 

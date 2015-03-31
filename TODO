@@ -1,4 +1,3 @@
-- rename s3m to ??
 - implement S3 filestore
 - implement presigning of packages
 - implement command line user interface
