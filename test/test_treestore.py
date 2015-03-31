@@ -8,6 +8,14 @@ from s3ts.treestore import TreeStore
 import boto
 import logging
 
+class CaptureProgress:
+    def __init__( self ):
+        self.recorded = []
+
+    def __call__( self, nBytes ):
+        self.recorded.append( nBytes )
+
+        
 class TestTreeStore(unittest.TestCase):
 
     def setUp(self):
@@ -47,8 +55,10 @@ class TestTreeStore(unittest.TestCase):
         # Verify it
         treestore.verify( pkg )
 
-        # Download it
-        treestore.download( pkg )
+        # Download it, checking we get expected progress callbacks
+        cb = CaptureProgress()
+        treestore.download( pkg, cb )
+        self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
 
         # Install it
         destTree = os.path.join( self.workdir, 'dest-1' )
@@ -87,8 +97,10 @@ class TestTreeStore(unittest.TestCase):
         # Verify it
         treestore.verify( pkg )
 
-        # Download it
-        treestore.download( pkg )
+        # Download it, checking we get expected progress callbacks
+        cb = CaptureProgress()
+        treestore.download( pkg, cb )
+        self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
 
         # Install it
         destTree = os.path.join( self.workdir, 'dest-1' )
@@ -105,8 +117,10 @@ class TestTreeStore(unittest.TestCase):
         # to ensure that we actually redownload each chunk
         localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
         treestore = TreeStore.open( fileStore, localCache )
-        treestore.downloadHttp( pkg )
-
+        cb = CaptureProgress()
+        treestore.downloadHttp( pkg, cb )
+        self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
+        
         # Install it
         destTree2 = os.path.join( self.workdir, 'dest-2' )
         treestore.install( pkg, destTree2 )

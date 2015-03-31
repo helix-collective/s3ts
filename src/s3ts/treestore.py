@@ -63,8 +63,12 @@ class TreeStore(object):
                 if not self.filesStore.exists( cpath ):
                     raise RuntimeError, "{0} not found".format(cpath)
 
-    def download( self,  pkg ):
-        """downloads all data not already present to the local cache"""
+    def download( self,  pkg, progressCB ):
+        """downloads all data not already present to the local cache
+
+        progressCB will be called with parameters (nBytes) as the download progresses
+
+        """
         for pf in pkg.files:
             for chunk in pf.chunks:
                 cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
@@ -72,11 +76,13 @@ class TreeStore(object):
                     buf = self.filesStore.get( cpath )
                     self.__checkSha1( self.__decompress( buf, chunk.encoding ), chunk.sha1, cpath )
                     self.localCache.put( cpath, buf )
+                progressCB( chunk.size )
 
-    def downloadHttp( self, pkg ):
+    def downloadHttp( self, pkg, progressCB ):
         """downloads all data not already present to the local cache, using http.
 
         This requires that pkg already has embedded urls, created with the addUrls method
+        progressCB will be called with parameters (nBytes) as the download progresses
 
         """
         for pf in pkg.files:
@@ -88,6 +94,7 @@ class TreeStore(object):
                     buf = resp.content
                     self.__checkSha1( self.__decompress( buf, chunk.encoding ), chunk.sha1, cpath )
                     self.localCache.put( cpath, buf )
+                progressCB( chunk.size )
 
     def install( self, pkg, localPath ):
         """installs the given package into the local path"""
