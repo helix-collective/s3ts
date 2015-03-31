@@ -56,11 +56,19 @@ class TreeStore(object):
         return self.filesStore.list( TREES_PATH )
 
     def verify( self, pkg ):
-        """confirms that all data for the given package is present"""
+        """confirms that all data for the given package is present in the store"""
         for pf in pkg.files:
             for chunk in pf.chunks:
                 cpath = self.__chunkPath( chunk.sha1, chunk.encoding ) 
                 if not self.filesStore.exists( cpath ):
+                    raise RuntimeError, "{0} not found".format(cpath)
+
+    def verifyLocal( self, pkg ):
+        """confirms that all data for the given package is present in the local cache"""
+        for pf in pkg.files:
+            for chunk in pf.chunks:
+                cpath = self.__chunkPath( chunk.sha1, chunk.encoding ) 
+                if not self.localCache.exists( cpath ):
                     raise RuntimeError, "{0} not found".format(cpath)
 
     def download( self,  pkg, progressCB ):

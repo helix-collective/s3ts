@@ -60,6 +60,9 @@ class TestTreeStore(unittest.TestCase):
         treestore.download( pkg, cb )
         self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
 
+        # Verify it locally
+        treestore.verifyLocal( pkg )
+
         # Install it
         destTree = os.path.join( self.workdir, 'dest-1' )
         treestore.install( pkg, destTree )
@@ -101,6 +104,9 @@ class TestTreeStore(unittest.TestCase):
         cb = CaptureProgress()
         treestore.download( pkg, cb )
         self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
+
+        # Verify it locally
+        treestore.verifyLocal( pkg )
 
         # Install it
         destTree = os.path.join( self.workdir, 'dest-1' )
