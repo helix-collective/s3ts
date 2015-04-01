@@ -104,6 +104,10 @@ def installHttp( packageFile, localdir ):
     treeStore.install( pkg, localdir, PackageProgress("installed", pkg) )
     print
 
+def primeCache( localdir ):
+    treeStore = openTreeStore()
+    treeStore.prime( localdir )
+
 parser = argparse.ArgumentParser()
 
 subparsers = parser.add_subparsers(help='commands',dest='commandName')
@@ -119,14 +123,14 @@ info_parser.add_argument('treename', action='store', help='The name of the tree'
 
 upload_parser = subparsers.add_parser('upload', help='Upload a tree from the local filesystem')
 upload_parser.add_argument('treename', action='store', help='The name of the tree')
-upload_parser.add_argument('localdir', action='store', help='The local path of the file')
+upload_parser.add_argument('localdir', action='store', help='The local directory path')
 
 download_parser = subparsers.add_parser('download', help='Download a tree to the local cache')
 download_parser.add_argument('treename', action='store', help='The name of the tree')
 
 install_parser = subparsers.add_parser('install', help='Install a tree into the filesystem')
 install_parser.add_argument('treename', action='store', help='The name of the tree')
-install_parser.add_argument('localdir', action='store', help='The local path of the file')
+install_parser.add_argument('localdir', action='store', help='The local directory path')
 
 presign_parser = subparsers.add_parser('presign', help='Generate a package definition containing presigned urls ')
 presign_parser.add_argument('treename', action='store', help='The name of the tree')
@@ -138,7 +142,10 @@ downloadhttp_parser.add_argument('pkgfile', action='store', help='The file conta
 
 installhttp_parser = subparsers.add_parser('install-http', help='Install a tree from local cache using a presigned package file')
 installhttp_parser.add_argument('pkgfile', action='store', help='The file containing the package definition')
-installhttp_parser.add_argument('localdir', action='store', help='The local path of the file')
+installhttp_parser.add_argument('localdir', action='store', help='The local directory path')
+
+primecache_parser = subparsers.add_parser('prime-cache', help='Prime the local cache with the contents of a local directory')
+primecache_parser.add_argument('localdir', action='store', help='The local directory path')
 
 def main():
     args = parser.parse_args()
@@ -160,6 +167,8 @@ def main():
         downloadHttp( args.pkgfile )
     elif args.commandName == 'install-http':
         installHttp( args.pkgfile, args.localdir )
+    elif args.commandName == 'prime-cache':
+        primeCache( args.localdir )
 
 if __name__ == '__main__':
     main()

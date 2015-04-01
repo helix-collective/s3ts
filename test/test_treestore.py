@@ -35,6 +35,15 @@ class TestTreeStore(unittest.TestCase):
                 'sydney london paris port moresby okinawa st petersburg salt lake city  new york whitehorse mawson woy woy st louis\n'
         )
 
+        self.srcTree2 = makeEmptyDir( os.path.join( self.workdir, 'src-2' ) )
+        fs = LocalFileStore( self.srcTree2 )
+        fs.put( 'code/file1.py', '#!/bin/env python\n def main(): print "hello!"\n' )
+        fs.put( 'code/file3.py', '#!/bin/env python\n def main(): print "goodbye foreever"\n' )
+        fs.put( 'assets/car-01.db',
+                'Some big and complicated data structure goes here, hopefully big enough that it requires chunking and compression.\n'
+                'sydney london paris port moresby okinawa st petersburg salt lake city  new york whitehorse mawson woy woy st louis\n'
+        )
+
     def tearDown(self):
         # shutil.rmtree( self.workdir )
         pass
@@ -54,6 +63,9 @@ class TestTreeStore(unittest.TestCase):
 
         # Verify it
         treestore.verify( pkg )
+
+        # Test the cache priming function
+        treestore.prime( self.srcTree2 )
 
         # Download it, checking we get expected progress callbacks
         cb = CaptureProgress()

@@ -16,53 +16,45 @@ class TreeStore(object):
     """
 
     @classmethod
-    def create( cls, fileStore, localCache, config ):
+    def create( cls, pkgStore, localCache, config ):
         """creates a new treestore"""
         try:
-            fileStore.get( CONFIG_PATH )
+            pkgStore.get( CONFIG_PATH )
             raise RuntimeError, "treestore is already initialised"
         except KeyError:
-            fileStore.putToJson( CONFIG_PATH, config, TreeStoreConfigJS() )
-            return cls( fileStore, localCache, config )
+            pkgStore.putToJson( CONFIG_PATH, config, TreeStoreConfigJS() )
+            return cls( pkgStore, localCache, config )
 
     @classmethod
-    def open( cls, fileStore, localCache ):
+    def open( cls, pkgStore, localCache ):
         """opens a existing treestore"""
-        return cls( fileStore, localCache, fileStore.getFromJson( CONFIG_PATH, TreeStoreConfigJS() ) )
+        return cls( pkgStore, localCache, pkgStore.getFromJson( CONFIG_PATH, TreeStoreConfigJS() ) )
     
-    def __init__( self, filesStore, localCache, config ):
-        self.filesStore = filesStore
+    def __init__( self, pkgStore, localCache, config ):
+        self.pkgStore = pkgStore
         self.localCache = localCache
         self.config = config
 
     def upload( self, treeName, localPath ):
-        """Uploads a local directory tree to the given name"""
-        if not os.path.isdir( localPath ):
-            raise IOError( "directory {0} doesn't exist".format( localPath ) )
-        packageFiles = []
-        for root, dirs, files in os.walk(localPath):
-            for file in files:
-                rpath = os.path.relpath( os.path.join(root, file), localPath )
-                packageFiles.append( self.__uploadFile( localPath, rpath ) )
-
+        packageFiles = self.__storeFiles( self.pkgStore, localPath )
         pkg = package.Package( treeName, packageFiles )
-        self.filesStore.putToJson( self.__treeNamePath( treeName ), pkg, package.PackageJS() )
+        self.pkgStore.putToJson( self.__treeNamePath( treeName ), pkg, package.PackageJS() )
         return pkg
 
     def find( self, treeName ):
         """Return the package definition for the given name"""
-        return self.filesStore.getFromJson( self.__treeNamePath( treeName ), package.PackageJS() )
+        return self.pkgStore.getFromJson( self.__treeNamePath( treeName ), package.PackageJS() )
 
     def list( self ):
         """Returns the available packages names"""
-        return self.filesStore.list( TREES_PATH )
+        return self.pkgStore.list( TREES_PATH )
 
     def verify( self, pkg ):
         """confirms that all data for the given package is present in the store"""
         for pf in pkg.files:
             for chunk in pf.chunks:
                 cpath = self.__chunkPath( chunk.sha1, chunk.encoding ) 
-                if not self.filesStore.exists( cpath ):
+                if not self.pkgStore.exists( cpath ):
                     raise RuntimeError, "{0} not found".format(cpath)
 
     def verifyLocal( self, pkg ):
@@ -83,7 +75,7 @@ class TreeStore(object):
             for chunk in pf.chunks:
                 cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
                 if not self.localCache.exists( cpath ):
-                    buf = self.filesStore.get( cpath )
+                    buf = self.pkgStore.get( cpath )
                     self.__checkSha1( self.__decompress( buf, chunk.encoding ), chunk.sha1, cpath )
                     self.localCache.put( cpath, buf )
                 progressCB( chunk.size )
@@ -136,9 +128,23 @@ class TreeStore(object):
         for pf in pkg.files:
             for chunk in pf.chunks:
                 cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
-                chunk.url = self.filesStore.url( cpath, expiresInSecs )
+                chunk.url = self.pkgStore.url( cpath, expiresInSecs )
 
-    def __uploadFile( self, root, rpath ):
+    def prime( self, localPath ):
+        """Walk a local directory tree and ensure that all chunks of all files are present in the local cache"""
+        self.__storeFiles( self.localCache, localPath )
+        
+    def __storeFiles( self, store, localPath ):
+        if not os.path.isdir( localPath ):
+            raise IOError( "directory {0} doesn't exist".format( localPath ) )
+        packageFiles = []
+        for root, dirs, files in os.walk(localPath):
+            for file in files:
+                rpath = os.path.relpath( os.path.join(root, file), localPath )
+                packageFiles.append( self.__storeFile( store, localPath, rpath ) )
+        return packageFiles
+
+    def __storeFile( self, store, root, rpath ):
         filesha1 = hashlib.sha1()
         chunks = []
         with open( os.path.join( root, rpath ), 'rb' ) as f:
@@ -153,14 +159,14 @@ class TreeStore(object):
                 encoding = package.ENCODING_RAW
                 if self.config.useCompression:
                     buf,encoding = self.__compress( buf )
-                chunks.append( self.__uploadChunk( chunksha1.hexdigest(), encoding, buf, size ) )
-            
+                chunks.append( self.__storeChunk( store, chunksha1.hexdigest(), encoding, buf, size ) )
+
         return package.PackageFile( filesha1.hexdigest(), rpath, chunks )
 
-    def __uploadChunk( self, sha1, encoding, buf, size ):
+    def __storeChunk( self, store, sha1, encoding, buf, size ):
         cpath = self.__chunkPath( sha1, encoding )
-        if not self.filesStore.exists( cpath ):
-            self.filesStore.put( cpath, buf )
+        if not store.exists( cpath ):
+            store.put( cpath, buf )
         return package.FileChunk( sha1, size, encoding, None )
 
     def __treeNamePath( self, treeName ):
