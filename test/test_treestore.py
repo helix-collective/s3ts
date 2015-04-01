@@ -65,7 +65,7 @@ class TestTreeStore(unittest.TestCase):
 
         # Install it
         destTree = os.path.join( self.workdir, 'dest-1' )
-        treestore.install( pkg, destTree )
+        treestore.install( pkg, destTree, CaptureProgress() )
 
         # Check that the installed tree is the same as the source tree
         self.assertEquals( subprocess.call( 'diff -r {0} {1}'.format(self.srcTree,destTree), shell=True ), 0 )
@@ -110,7 +110,7 @@ class TestTreeStore(unittest.TestCase):
 
         # Install it
         destTree = os.path.join( self.workdir, 'dest-1' )
-        treestore.install( pkg, destTree )
+        treestore.install( pkg, destTree, CaptureProgress() )
 
         # Check that the installed tree is the same as the source tree
         self.assertEquals( subprocess.call( 'diff -r {0} {1}'.format(self.srcTree,destTree), shell=True ), 0 )
@@ -129,7 +129,7 @@ class TestTreeStore(unittest.TestCase):
         
         # Install it
         destTree2 = os.path.join( self.workdir, 'dest-2' )
-        treestore.install( pkg, destTree2 )
+        treestore.install( pkg, destTree2, CaptureProgress() )
         
         # Check that the new installed tree is the same as the source tree
         self.assertEquals( subprocess.call( 'diff -r {0} {1}'.format(self.srcTree,destTree2), shell=True ), 0 )

@@ -11,7 +11,7 @@ class Package(object):
         self.files = files
 
     def size(self):
-        return sum( [pf.size for pf in self.files] )
+        return sum( [pf.size() for pf in self.files] )
 
 class PackageFile(object):
     """represents a single file to be downloaded."""

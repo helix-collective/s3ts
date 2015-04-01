@@ -1,7 +1,7 @@
 import os, hashlib, zlib, tempfile
 import requests
 
-from s3ts.config import TreeStoreConfigJS
+from s3ts.config import TreeStoreConfig, TreeStoreConfigJS
 from s3ts import package
 
 CONFIG_PATH = 'config'
@@ -37,6 +37,8 @@ class TreeStore(object):
 
     def upload( self, treeName, localPath ):
         """Uploads a local directory tree to the given name"""
+        if not os.path.isdir( localPath ):
+            raise IOError( "directory {0} doesn't exist".format( localPath ) )
         packageFiles = []
         for root, dirs, files in os.walk(localPath):
             for file in files:
@@ -104,8 +106,12 @@ class TreeStore(object):
                     self.localCache.put( cpath, buf )
                 progressCB( chunk.size )
 
-    def install( self, pkg, localPath ):
-        """installs the given package into the local path"""
+    def install( self, pkg, localPath, progressCB ):
+        """installs the given package into the local path
+
+        progressCB will be called with parameters (nBytes) as the installation progresses
+
+        """
         for pf in pkg.files:
             filesha1 = hashlib.sha1()
             with tempfile.NamedTemporaryFile(delete=False) as f:
@@ -116,6 +122,7 @@ class TreeStore(object):
                     filesha1.update( buf )
                     self.__checkSha1( buf, chunk.sha1, cpath )
                     f.write( buf )
+                    progressCB( len(buf) )
             if filesha1.hexdigest() != pf.sha1:
                 raise RuntimeError, "sha1 for {0} doesn't match".format(pf.path)
             targetPath = os.path.join( localPath, pf.path )
