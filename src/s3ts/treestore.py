@@ -29,6 +29,11 @@ class TreeStore(object):
     def open( cls, pkgStore, localCache ):
         """opens a existing treestore"""
         return cls( pkgStore, localCache, pkgStore.getFromJson( CONFIG_PATH, TreeStoreConfigJS() ) )
+
+    @classmethod
+    def forHttpOnly( cls, localCache ):
+        """create a treestore that only supports the downloadHttp method"""
+        return cls( None, localCache, None )
     
     def __init__( self, pkgStore, localCache, config ):
         self.pkgStore = pkgStore

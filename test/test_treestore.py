@@ -134,7 +134,7 @@ class TestTreeStore(unittest.TestCase):
         # And download it directly via http. Create a new local cache
         # to ensure that we actually redownload each chunk
         localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
-        treestore = TreeStore.open( fileStore, localCache )
+        treestore = TreeStore.forHttpOnly( localCache )
         cb = CaptureProgress()
         treestore.downloadHttp( pkg, cb )
         self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
