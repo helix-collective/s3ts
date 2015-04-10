@@ -14,6 +14,36 @@ def getEnv( name, desc ):
         sys.stderr.write( 'The environment variable {0} must be set to {1}\n'.format( name, desc ) )
         sys.exit(1)
 
+class UploadProgress(object):
+    def __init__( self ):
+        self.cumTransferred = 0
+        self.cumCached = 0
+
+    def __call__( self, nDownloaded, nCached ):
+        self.cumTransferred += nDownloaded
+        self.cumCached += nCached
+        print "\r{0}+{1} bytes transferred".format( self.cumTransferred, self.cumCached ),
+
+class DownloadProgress(object):
+    def __init__( self, pkg ):
+        self.size = pkg.size()
+        self.cumTransferred = 0
+        self.cumCached = 0
+
+    def __call__( self, nDownloaded, nCached ):
+        self.cumTransferred += nDownloaded
+        self.cumCached += nCached
+        print "\r{0}+{1}/{2} bytes downloaded".format( self.cumTransferred, self.cumCached, self.size ),
+
+class InstallProgress(object):
+    def __init__( self, pkg ):
+        self.size = pkg.size()
+        self.cumSize = 0
+
+    def __call__( self, nbytes ):
+        self.cumSize += nbytes
+        print "\r{0}/{1} bytes installed".format( self.cumSize, self.size ),
+        
 def connectToBucket():
     awsAccessKeyId = getEnv( 'AWS_ACCESS_KEY_ID', 'the AWS access key id' )
     awsSecretAccessKey = getEnv( 'AWS_SECRET_ACCESS_KEY', 'the AWS secret access key' )
@@ -60,29 +90,20 @@ def info( treename ):
 
 def upload( treename, localdir ):
     treeStore = openTreeStore()
-    treeStore.upload( treename, localdir )
+    treeStore.upload( treename, localdir, UploadProgress() )
+    print
 
-class PackageProgress(object):
-    def __init__( self, action, pkg ):
-        self.action = action
-        self.size = pkg.size()
-        self.cumSize = 0
-
-    def __call__( self, nbytes ):
-        self.cumSize += nbytes
-        print "\r{0}/{1} bytes {2}".format( self.cumSize, self.size, self.action ),
-        
 def download( treename ):
     treeStore = openTreeStore()
     pkg = treeStore.find( treename )
-    treeStore.download( pkg, PackageProgress("downloaded", pkg) )
+    treeStore.download( pkg, DownloadProgress(pkg) )
     print
 
 def install( treename, localdir ):
     treeStore = openTreeStore()
     pkg = treeStore.find( treename )
     treeStore.verifyLocal( pkg )
-    treeStore.install( pkg, localdir, PackageProgress("installed", pkg) )
+    treeStore.install( pkg, localdir, InstallProgress(pkg) )
     print
 
 def presign( treename, expirySecs ):
@@ -94,19 +115,19 @@ def presign( treename, expirySecs ):
 def downloadHttp( packageFile ):
     treeStore = nonS3TreeStore()
     pkg = readPackageFile( packageFile )
-    treeStore.downloadHttp( pkg, PackageProgress("downloaded", pkg) )
+    treeStore.downloadHttp( pkg, DownloadProgress(pkg) )
     print
 
 def installHttp( packageFile, localdir ):
     treeStore = nonS3TreeStore()
     pkg = readPackageFile( packageFile )
     treeStore.verifyLocal( pkg )
-    treeStore.install( pkg, localdir, PackageProgress("installed", pkg) )
+    treeStore.install( pkg, localdir, InstallProgress(pkg) )
     print
 
 def primeCache( localdir ):
     treeStore = openTreeStore()
-    treeStore.prime( localdir )
+    treeStore.prime( localdir, UploadProgress() )
 
 parser = argparse.ArgumentParser()
 

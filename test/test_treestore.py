@@ -2,13 +2,22 @@ import os, tempfile, unittest, shutil, subprocess
 
 from s3ts.filestore import LocalFileStore
 from s3ts.s3filestore import S3FileStore
-from s3ts.config import TreeStoreConfig
+from s3ts.config import TreeStoreConfig, readInstallProperties, S3TS_PROPERTIES
 from s3ts.treestore import TreeStore
 
 import boto
 import logging
 
-class CaptureProgress:
+class CaptureDownloadProgress:
+    def __init__( self ):
+        self.recorded = []
+
+    def __call__( self, bytesDownloaded, bytesFromCache ):
+        self.recorded.append( bytesDownloaded + bytesFromCache )
+
+CaptureUploadProgress = CaptureDownloadProgress
+    
+class CaptureInstallProgress:
     def __init__( self ):
         self.recorded = []
 
@@ -16,6 +25,19 @@ class CaptureProgress:
         self.recorded.append( nBytes )
 
         
+class EmptyS3Bucket:
+    def __init__( self, bucket ):
+        self.bucket = bucket
+        
+    def __enter__(self):
+        # Ensure the bucket starts empty
+        assert len(list(self.bucket.list()))==0, "S3 bucket is not empty"
+
+    def __exit__(self, type, value, traceback):
+        # Clean the bucket (ok, as we know it started empty)
+        self.bucket.delete_keys( self.bucket.list() )
+
+
 class TestTreeStore(unittest.TestCase):
 
     def setUp(self):
@@ -55,7 +77,7 @@ class TestTreeStore(unittest.TestCase):
         treestore = TreeStore.create( fileStore, localCache, TreeStoreConfig( 100, True ) )
         
         # Upload it as a tree
-        treestore.upload( 'v1.0', self.srcTree )
+        treestore.upload( 'v1.0', self.srcTree, CaptureUploadProgress() )
         pkg = treestore.find( 'v1.0' )
 
         # Confirm it's in the index
@@ -65,10 +87,10 @@ class TestTreeStore(unittest.TestCase):
         treestore.verify( pkg )
 
         # Test the cache priming function
-        treestore.prime( self.srcTree2 )
+        treestore.prime( self.srcTree2, CaptureUploadProgress() )
 
         # Download it, checking we get expected progress callbacks
-        cb = CaptureProgress()
+        cb = CaptureDownloadProgress()
         treestore.download( pkg, cb )
         self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
 
@@ -77,10 +99,10 @@ class TestTreeStore(unittest.TestCase):
 
         # Install it
         destTree = os.path.join( self.workdir, 'dest-1' )
-        treestore.install( pkg, destTree, CaptureProgress() )
+        treestore.install( pkg, destTree, CaptureInstallProgress() )
 
         # Check that the installed tree is the same as the source tree
-        self.assertEquals( subprocess.call( 'diff -r {0} {1}'.format(self.srcTree,destTree), shell=True ), 0 )
+        self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
 
     def test_s3_treestore(self):
         # Create an s3 backed treestore
@@ -90,61 +112,61 @@ class TestTreeStore(unittest.TestCase):
         #   AWS_SECRET_ACCESS_KEY
         #   TS_TEST_S3_BUCKET
         #
-        # NB: **this will delete all keys in the test bucket**
+        # NB: **this will only work if the bucket is empty
 
         s3c = boto.connect_s3()
         bucket = s3c.get_bucket( os.environ['TS_TEST_S3_BUCKET'] )
-        bucket.delete_keys( bucket.list() )
 
-#        boto.set_stream_logger('boto')
-        
-        fileStore = S3FileStore( bucket )
-        localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
-        treestore = TreeStore.create( fileStore, localCache, TreeStoreConfig( 100, True ) )
-        
-        # Upload it as a tree
-        treestore.upload( 'v1.0', self.srcTree )
-        pkg = treestore.find( 'v1.0' )
+        with EmptyS3Bucket(bucket):
+            fileStore = S3FileStore( bucket )
+            localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
+            treestore = TreeStore.create( fileStore, localCache, TreeStoreConfig( 100, True ) )
 
-        # Confirm it's in the index
-        self.assertEquals( treestore.list(), ['v1.0'] )
+            # Upload it as a tree
+            treestore.upload( 'v1.0', self.srcTree, CaptureUploadProgress() )
+            pkg = treestore.find( 'v1.0' )
 
-        # Verify it
-        treestore.verify( pkg )
+            # Confirm it's in the index
+            self.assertEquals( treestore.list(), ['v1.0'] )
 
-        # Download it, checking we get expected progress callbacks
-        cb = CaptureProgress()
-        treestore.download( pkg, cb )
-        self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
+            # Verify it
+            treestore.verify( pkg )
 
-        # Verify it locally
-        treestore.verifyLocal( pkg )
+            # Download it, checking we get expected progress callbacks
+            cb = CaptureDownloadProgress()
+            treestore.download( pkg, cb )
+            self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
 
-        # Install it
-        destTree = os.path.join( self.workdir, 'dest-1' )
-        treestore.install( pkg, destTree, CaptureProgress() )
+            # Verify it locally
+            treestore.verifyLocal( pkg )
 
-        # Check that the installed tree is the same as the source tree
-        self.assertEquals( subprocess.call( 'diff -r {0} {1}'.format(self.srcTree,destTree), shell=True ), 0 )
+            # Install it
+            destTree = os.path.join( self.workdir, 'dest-1' )
+            treestore.install( pkg, destTree, CaptureInstallProgress() )
 
-        # Now create a pre-signed version of the package
-        pkg = treestore.find( 'v1.0' )
-        treestore.addUrls( pkg, 3600 )
+            # Check that the installed tree is the same as the source tree
+            self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
 
-        # And download it directly via http. Create a new local cache
-        # to ensure that we actually redownload each chunk
-        localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
-        treestore = TreeStore.forHttpOnly( localCache )
-        cb = CaptureProgress()
-        treestore.downloadHttp( pkg, cb )
-        self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
-        
-        # Install it
-        destTree2 = os.path.join( self.workdir, 'dest-2' )
-        treestore.install( pkg, destTree2, CaptureProgress() )
-        
-        # Check that the new installed tree is the same as the source tree
-        self.assertEquals( subprocess.call( 'diff -r {0} {1}'.format(self.srcTree,destTree2), shell=True ), 0 )
+            self.assertEquals( readInstallProperties(destTree).treeName, 'v1.0' )
+
+            # Now create a pre-signed version of the package
+            pkg = treestore.find( 'v1.0' )
+            treestore.addUrls( pkg, 3600 )
+
+            # And download it directly via http. Create a new local cache
+            # to ensure that we actually redownload each chunk
+            localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
+            treestore = TreeStore.forHttpOnly( localCache )
+            cb = CaptureDownloadProgress()
+            treestore.downloadHttp( pkg, cb )
+            self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
+
+            # Install it
+            destTree2 = os.path.join( self.workdir, 'dest-2' )
+            treestore.install( pkg, destTree2, CaptureInstallProgress() )
+
+            # Check that the new installed tree is the same as the source tree
+            self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree2), shell=True ), 0 )
         
 
 def makeEmptyDir( path ):

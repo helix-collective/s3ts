@@ -6,8 +6,8 @@ ENCODING_ZLIB = 'zlib'
 class Package(object):
     """represents a collection of files to be downloaded."""
     
-    def __init__( self, packageName, files ):
-        self.packageName = packageName
+    def __init__( self, name, files ):
+        self.name = name
         self.files = files
 
     def size(self):
@@ -41,7 +41,7 @@ class PackageJS(object):
                         
     def toJson( self, v ):
         return {
-            'name' : v.packageName,
+            'name' : v.name,
             'files' : [ self.packageFileJS.toJson(f) for f in v.files ],
         }
 

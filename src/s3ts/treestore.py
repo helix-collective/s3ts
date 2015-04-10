@@ -1,7 +1,7 @@
-import os, hashlib, zlib, tempfile
+import os, hashlib, zlib, tempfile, datetime
 import requests
 
-from s3ts.config import TreeStoreConfig, TreeStoreConfigJS
+from s3ts.config import TreeStoreConfig, TreeStoreConfigJS, InstallProperties, writeInstallProperties
 from s3ts import package
 
 CONFIG_PATH = 'config'
@@ -40,8 +40,14 @@ class TreeStore(object):
         self.localCache = localCache
         self.config = config
 
-    def upload( self, treeName, localPath ):
-        packageFiles = self.__storeFiles( self.pkgStore, localPath )
+    def upload( self, treeName, localPath, progressCB ):
+        """Creates a package for the content of localPath.
+
+        This uploads the package definition and any file chunks not already uploaded.
+        progressCB will be called with parameters (bytesUploaded,bytesCached) as the upload progresses
+
+        """
+        packageFiles = self.__storeFiles( self.pkgStore, localPath, progressCB )
         pkg = package.Package( treeName, packageFiles )
         self.pkgStore.putToJson( self.__treeNamePath( treeName ), pkg, package.PackageJS() )
         return pkg
@@ -73,60 +79,77 @@ class TreeStore(object):
     def download( self,  pkg, progressCB ):
         """downloads all data not already present to the local cache
 
-        progressCB will be called with parameters (nBytes) as the download progresses
+        progressCB will be called with parameters (bytesDownloaded,bytesFromCache) as the download progresses
 
         """
         for pf in pkg.files:
             for chunk in pf.chunks:
                 cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
-                if not self.localCache.exists( cpath ):
+                if self.localCache.exists( cpath ):
+                    progressCB( 0, chunk.size )
+                else:
                     buf = self.pkgStore.get( cpath )
                     self.__checkSha1( self.__decompress( buf, chunk.encoding ), chunk.sha1, cpath )
                     self.localCache.put( cpath, buf )
-                progressCB( chunk.size )
+                    progressCB( chunk.size, 0 )
 
     def downloadHttp( self, pkg, progressCB ):
         """downloads all data not already present to the local cache, using http.
 
         This requires that pkg already has embedded urls, created with the addUrls method
-        progressCB will be called with parameters (nBytes) as the download progresses
+        progressCB will be called with parameters (bytesDownloaded,bytesFromCache) as the download progresses
 
         """
         for pf in pkg.files:
             for chunk in pf.chunks:
                 cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
-                if not self.localCache.exists( cpath ):
+                if self.localCache.exists( cpath ):
+                    progressCB( 0, chunk.size )
+                else:
                     resp = requests.get( chunk.url )
                     resp.raise_for_status()
                     buf = resp.content
                     self.__checkSha1( self.__decompress( buf, chunk.encoding ), chunk.sha1, cpath )
                     self.localCache.put( cpath, buf )
-                progressCB( chunk.size )
+                    progressCB( chunk.size, 0 )
 
     def install( self, pkg, localPath, progressCB ):
         """installs the given package into the local path
 
-        progressCB will be called with parameters (nBytes) as the installation progresses
+        progressCB will be called with parameters (nBytes) as the installation progresses,
 
         """
+        installTime = datetime.datetime.now()
+        
         for pf in pkg.files:
-            filesha1 = hashlib.sha1()
-            with tempfile.NamedTemporaryFile(delete=False) as f:
-                for chunk in pf.chunks:
-                    cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
-                    buf = self.localCache.get( cpath )
-                    buf = self.__decompress( buf, chunk.encoding )
-                    filesha1.update( buf )
-                    self.__checkSha1( buf, chunk.sha1, cpath )
-                    f.write( buf )
-                    progressCB( len(buf) )
-            if filesha1.hexdigest() != pf.sha1:
-                raise RuntimeError, "sha1 for {0} doesn't match".format(pf.path)
             targetPath = os.path.join( localPath, pf.path )
             targetDir = os.path.dirname(targetPath)
+                
             if not os.path.exists( targetDir ):
                 os.makedirs( targetDir )
-            os.rename( f.name, targetPath )
+
+            f = None
+            try:
+                filesha1 = hashlib.sha1()
+                with tempfile.NamedTemporaryFile(delete=False,dir=targetDir) as f:
+                    for chunk in pf.chunks:
+                        cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
+                        buf = self.localCache.get( cpath )
+                        buf = self.__decompress( buf, chunk.encoding )
+                        filesha1.update( buf )
+                        self.__checkSha1( buf, chunk.sha1, cpath )
+                        f.write( buf )
+                        progressCB( len(buf) )
+                if filesha1.hexdigest() != pf.sha1:
+                    raise RuntimeError, "sha1 for {0} doesn't match".format(pf.path)
+
+                os.rename( f.name, targetPath )
+            except:
+                if f: os.unlink( f.name )
+                raise
+
+            # write details of the install
+            writeInstallProperties( localPath, InstallProperties( pkg.name, installTime ) )
 
     def addUrls( self, pkg, expiresInSecs ):
         """Update the given package so that it can be accessed directly via pre-signed http urls"""
@@ -135,21 +158,21 @@ class TreeStore(object):
                 cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
                 chunk.url = self.pkgStore.url( cpath, expiresInSecs )
 
-    def prime( self, localPath ):
+    def prime( self, localPath, progressCB ):
         """Walk a local directory tree and ensure that all chunks of all files are present in the local cache"""
-        self.__storeFiles( self.localCache, localPath )
+        self.__storeFiles( self.localCache, localPath, progressCB )
         
-    def __storeFiles( self, store, localPath ):
+    def __storeFiles( self, store, localPath, progressCB ):
         if not os.path.isdir( localPath ):
             raise IOError( "directory {0} doesn't exist".format( localPath ) )
         packageFiles = []
         for root, dirs, files in os.walk(localPath):
             for file in files:
                 rpath = os.path.relpath( os.path.join(root, file), localPath )
-                packageFiles.append( self.__storeFile( store, localPath, rpath ) )
+                packageFiles.append( self.__storeFile( store, localPath, rpath, progressCB ) )
         return packageFiles
 
-    def __storeFile( self, store, root, rpath ):
+    def __storeFile( self, store, root, rpath, progressCB ):
         filesha1 = hashlib.sha1()
         chunks = []
         with open( os.path.join( root, rpath ), 'rb' ) as f:
@@ -164,14 +187,17 @@ class TreeStore(object):
                 encoding = package.ENCODING_RAW
                 if self.config.useCompression:
                     buf,encoding = self.__compress( buf )
-                chunks.append( self.__storeChunk( store, chunksha1.hexdigest(), encoding, buf, size ) )
+                chunks.append( self.__storeChunk( store, chunksha1.hexdigest(), encoding, buf, size, progressCB ) )
 
         return package.PackageFile( filesha1.hexdigest(), rpath, chunks )
 
-    def __storeChunk( self, store, sha1, encoding, buf, size ):
+    def __storeChunk( self, store, sha1, encoding, buf, size, progressCB ):
         cpath = self.__chunkPath( sha1, encoding )
-        if not store.exists( cpath ):
+        if store.exists( cpath ):
+            progressCB( 0, size )
+        else:
             store.put( cpath, buf )
+            progressCB( size, 0 )
         return package.FileChunk( sha1, size, encoding, None )
 
     def __treeNamePath( self, treeName ):

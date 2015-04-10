@@ -2,6 +2,8 @@
 contains classes for configuration and settings
 """
 
+import os, json, datetime
+
 class S3Access(object):
     """Provide connection parameters for an s3m store"""
 
@@ -44,6 +46,38 @@ class TreeStoreConfigJS(object):
             'useCompression' : v.useCompression,
             }
 
+class InstallProperties(object):
+    """records the details of an installation"""
+
+    def __init__( self, treeName, installTime ):
+        self.treeName = treeName
+        self.installTime = installTime
+
+class InstallPropertiesJS(object):
+    """De/serialise InstallProperties objects"""
+
+    def fromJson( self, jv ):
+        return InstallProperties(
+            jv['treeName'],
+            datetime.datetime.strptime( jv['installTime'], '%Y-%m-%dT%H:%M:%S.%f' )
+            )
+
+    def toJson( self, v ):
+        return {
+            'treeName' : v.treeName,
+            'installTime' : v.installTime.isoformat(),
+            }
+
+S3TS_PROPERTIES = '.s3ts.properties'    
+
+
+def writeInstallProperties( installDir, props ):
+    with open( os.path.join( installDir, S3TS_PROPERTIES ), 'w' ) as f:
+        f.write( json.dumps( InstallPropertiesJS().toJson( props ) ) )
+
+def readInstallProperties( installDir ):
+    with open( os.path.join( installDir, S3TS_PROPERTIES ), 'r' ) as f:
+        return InstallPropertiesJS().fromJson( json.loads( f.read() ) )
     
+
         
-    
