@@ -1,4 +1,4 @@
-import os, sys, argparse, json
+import os, sys, argparse, json, datetime
 
 import boto
 
@@ -83,14 +83,16 @@ def info( treename ):
     treeStore = openTreeStore()
     pkg = treeStore.find( treename )
     print 'Package:', treename
+    print 'Created At:', pkg.creationTime.isoformat()
     print 'Total Size: {0} bytes'.format(pkg.size())
     print 'Files:'
     for pf in pkg.files:
         print '    {0} ({1} chunks, {2} bytes)'.format( pf.path, len(pf.chunks), pf.size() )
 
 def upload( treename, localdir ):
+    creationTime = datetime.datetime.now()
     treeStore = openTreeStore()
-    treeStore.upload( treename, localdir, UploadProgress() )
+    treeStore.upload( treename, creationTime, localdir, UploadProgress() )
     print
 
 def download( treename ):

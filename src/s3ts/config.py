@@ -4,6 +4,8 @@ contains classes for configuration and settings
 
 import os, json, datetime
 
+from s3ts.utils import datetimeFromIso
+
 class S3Access(object):
     """Provide connection parameters for an s3m store"""
 
@@ -59,7 +61,7 @@ class InstallPropertiesJS(object):
     def fromJson( self, jv ):
         return InstallProperties(
             jv['treeName'],
-            datetime.datetime.strptime( jv['installTime'], '%Y-%m-%dT%H:%M:%S.%f' )
+            datetimeFromIso( jv['installTime'] )
             )
 
     def toJson( self, v ):

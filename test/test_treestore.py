@@ -1,9 +1,10 @@
-import os, tempfile, unittest, shutil, subprocess
+import os, tempfile, unittest, shutil, subprocess, datetime
 
 from s3ts.filestore import LocalFileStore
 from s3ts.s3filestore import S3FileStore
 from s3ts.config import TreeStoreConfig, readInstallProperties, S3TS_PROPERTIES
 from s3ts.treestore import TreeStore
+from s3ts.utils import datetimeFromIso
 
 import boto
 import logging
@@ -77,7 +78,8 @@ class TestTreeStore(unittest.TestCase):
         treestore = TreeStore.create( fileStore, localCache, TreeStoreConfig( 100, True ) )
         
         # Upload it as a tree
-        treestore.upload( 'v1.0', self.srcTree, CaptureUploadProgress() )
+        creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
+        treestore.upload( 'v1.0', creationTime, self.srcTree, CaptureUploadProgress() )
         pkg = treestore.find( 'v1.0' )
 
         # Confirm it's in the index
@@ -123,7 +125,8 @@ class TestTreeStore(unittest.TestCase):
             treestore = TreeStore.create( fileStore, localCache, TreeStoreConfig( 100, True ) )
 
             # Upload it as a tree
-            treestore.upload( 'v1.0', self.srcTree, CaptureUploadProgress() )
+            creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
+            treestore.upload( 'v1.0', creationTime, self.srcTree, CaptureUploadProgress() )
             pkg = treestore.find( 'v1.0' )
 
             # Confirm it's in the index

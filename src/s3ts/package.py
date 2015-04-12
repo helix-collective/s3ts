@@ -1,4 +1,6 @@
-import json
+import json, datetime
+
+from s3ts.utils import datetimeFromIso
 
 ENCODING_RAW = 'raw'
 ENCODING_ZLIB = 'zlib'
@@ -6,8 +8,9 @@ ENCODING_ZLIB = 'zlib'
 class Package(object):
     """represents a collection of files to be downloaded."""
     
-    def __init__( self, name, files ):
+    def __init__( self, name, creationTime, files ):
         self.name = name
+        self.creationTime = creationTime
         self.files = files
 
     def size(self):
@@ -37,11 +40,16 @@ class PackageJS(object):
         self.packageFileJS = PackageFileJS()
 
     def fromJson( self, jv ):
-        return Package( jv['name'], [self.packageFileJS.fromJson(jv1) for jv1 in jv['files']] )
+        return Package(
+            jv['name'],
+            datetimeFromIso( jv['creationTime'] ),
+            [self.packageFileJS.fromJson(jv1) for jv1 in jv['files']]
+        )
                         
     def toJson( self, v ):
         return {
             'name' : v.name,
+            'creationTime' : v.creationTime.isoformat(),
             'files' : [ self.packageFileJS.toJson(f) for f in v.files ],
         }
 

@@ -40,7 +40,7 @@ class TreeStore(object):
         self.localCache = localCache
         self.config = config
 
-    def upload( self, treeName, localPath, progressCB ):
+    def upload( self, treeName, creationTime, localPath, progressCB ):
         """Creates a package for the content of localPath.
 
         This uploads the package definition and any file chunks not already uploaded.
@@ -48,7 +48,7 @@ class TreeStore(object):
 
         """
         packageFiles = self.__storeFiles( self.pkgStore, localPath, progressCB )
-        pkg = package.Package( treeName, packageFiles )
+        pkg = package.Package( treeName, creationTime, packageFiles )
         self.pkgStore.putToJson( self.__treeNamePath( treeName ), pkg, package.PackageJS() )
         return pkg
 
