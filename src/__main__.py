@@ -98,6 +98,12 @@ def upload( treename, localdir ):
     treeStore.upload( treename, creationTime, localdir, UploadProgress() )
     print
 
+def uploadMany( treename, localdir, kioskDir ):
+    creationTime = datetime.datetime.now()
+    treeStore = openTreeStore()
+    treeStore.uploadMany(treename, creationTime, localdir, kioskDir, UploadProgress())
+    print
+
 def download( treename ):
     treeStore = openTreeStore()
     pkg = treeStore.find( treename )
@@ -173,6 +179,11 @@ installhttp_parser.add_argument('localdir', action='store', help='The local dire
 primecache_parser = subparsers.add_parser('prime-cache', help='Prime the local cache with the contents of a local directory')
 primecache_parser.add_argument('localdir', action='store', help='The local directory path')
 
+upload_many_parser = subparsers.add_parser('upload-many', help='Upload multiple trees from the local filesystem')
+upload_many_parser.add_argument('treename', action='store', help='The name of the tree')
+upload_many_parser.add_argument('localdir', action='store', help='The local directory path')
+upload_many_parser.add_argument('local_variant_dir', action='store', help='The local variant path')
+
 def main():
     args = parser.parse_args()
     if args.commandName == 'init':
@@ -195,6 +206,8 @@ def main():
         installHttp( args.pkgfile, args.localdir )
     elif args.commandName == 'prime-cache':
         primeCache( args.localdir )
+    elif args.commandName == 'upload-many':
+        uploadMany(args.treename, args.localdir, args.local_variant_dir)
 
 if __name__ == '__main__':
     main()

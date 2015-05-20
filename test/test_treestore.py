@@ -67,6 +67,11 @@ class TestTreeStore(unittest.TestCase):
                 'sydney london paris port moresby okinawa st petersburg salt lake city  new york whitehorse mawson woy woy st louis\n'
         )
 
+        self.srcVariant = makeEmptyDir( os.path.join( self.workdir, 'src1-kiosk' ) )
+        fs = LocalFileStore( self.srcVariant )
+        fs.put( 'kiosk-01/key', 'this is the key src1:kiosk-01' )
+        fs.put( 'kiosk-02/key', 'this is the key src1:kiosk-02' )
+
     def tearDown(self):
         # shutil.rmtree( self.workdir )
         pass
@@ -171,6 +176,56 @@ class TestTreeStore(unittest.TestCase):
             # Check that the new installed tree is the same as the source tree
             self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree2), shell=True ), 0 )
         
+    def test_s3_many_treestore(self):
+        # Create an s3 backed treestore
+        # Requires these environment variables set
+        #
+        #   AWS_ACCESS_KEY_ID
+        #   AWS_SECRET_ACCESS_KEY
+        #   S3TS_BUCKET
+        #
+        # NB: **this will only work if the bucket is empty
+
+        s3c = boto.connect_s3()
+        bucket = s3c.get_bucket( os.environ['S3TS_BUCKET'] )
+
+        with EmptyS3Bucket(bucket):
+            fileStore = S3FileStore( bucket )
+            localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
+            treestore = TreeStore.create( fileStore, localCache, TreeStoreConfig( 100, True ) )
+
+            # Upload it as a tree
+            creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
+            treestore.uploadMany( 'v1.0', creationTime, self.srcTree, self.srcVariant, CaptureUploadProgress() )
+            print treestore.list()
+            pkg = treestore.find( 'v1.0:kiosk-01' )
+
+            # Confirm it's in the index
+            self.assertEquals( treestore.list(), ['v1.0:kiosk-01', 'v1.0:kiosk-02'] )
+
+            # Verify it
+            treestore.verify( pkg )
+
+            # Download it, checking we get expected progress callbacks
+            cb = CaptureDownloadProgress()
+            treestore.download( pkg, cb )
+            self.assertEquals( cb.recorded, [100, 100, 30, 45, 47, 29] )
+
+            # Verify it locally
+            treestore.verifyLocal( pkg )
+
+            # Install it
+            destTree = os.path.join( self.workdir, 'dest-1' )
+            treestore.install( pkg, destTree, CaptureInstallProgress() )
+
+            # Check that the installed tree is the same as the source tree
+            self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree + '/assets',destTree + '/assets'), shell=True ), 0 )
+            self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree + '/code',destTree + '/code'), shell=True ), 0 )
+
+
+            self.assertEquals( readInstallProperties(destTree).treeName, 'v1.0:kiosk-01' )
+
+
 
 def makeEmptyDir( path ):
     if os.path.exists( path ):
