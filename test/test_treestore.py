@@ -17,7 +17,7 @@ class CaptureDownloadProgress:
         self.recorded.append( bytesDownloaded + bytesFromCache )
 
 CaptureUploadProgress = CaptureDownloadProgress
-    
+
 class CaptureInstallProgress:
     def __init__( self ):
         self.recorded = []
@@ -25,11 +25,11 @@ class CaptureInstallProgress:
     def __call__( self, nBytes ):
         self.recorded.append( nBytes )
 
-        
+
 class EmptyS3Bucket:
     def __init__( self, bucket ):
         self.bucket = bucket
-        
+
     def __enter__(self):
         # Ensure the bucket starts empty
         assert len(list(self.bucket.list()))==0, "S3 bucket is not empty"
@@ -81,7 +81,7 @@ class TestTreeStore(unittest.TestCase):
         fileStore = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'fs' ) ) )
         localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
         treestore = TreeStore.create( fileStore, localCache, TreeStoreConfig( 100, True ) )
-        
+
         # Upload it as a tree
         creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
         treestore.upload( 'v1.0', creationTime, self.srcTree, CaptureUploadProgress() )
@@ -175,7 +175,7 @@ class TestTreeStore(unittest.TestCase):
 
             # Check that the new installed tree is the same as the source tree
             self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree2), shell=True ), 0 )
-        
+
     def test_s3_many_treestore(self):
         # Create an s3 backed treestore
         # Requires these environment variables set
@@ -197,7 +197,6 @@ class TestTreeStore(unittest.TestCase):
             # Upload it as a tree
             creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
             treestore.uploadMany( 'v1.0', creationTime, self.srcTree, self.srcVariant, CaptureUploadProgress() )
-            print treestore.list()
             pkg = treestore.find( 'v1.0:kiosk-01' )
 
             # Confirm it's in the index
@@ -232,8 +231,8 @@ def makeEmptyDir( path ):
         shutil.rmtree( path )
     os.makedirs( path )
     return path
-                       
 
-        
+
+
 if __name__ == '__main__':
     unittest.main()
