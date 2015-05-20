@@ -32,3 +32,6 @@ class S3FileStore(FileStore):
     def url( self, path, expiresInSecs ):
         k = Key(self.bucket,path)
         return k.generate_url(expiresInSecs)
+
+    def mkPath( self, *elements):
+        return '/'.join(elements)

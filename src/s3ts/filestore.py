@@ -34,6 +34,9 @@ class FileStore(object):
 
     def url( self, path, expiresInSecs ):
         raise RuntimeError, "Not implemented"
+
+    def mkPath( self, *elements):
+        raise RuntimeError, "Not implemented"
     
 class LocalFileStore(FileStore):
     """implements the FileStore interface using the local file system"""
@@ -74,7 +77,7 @@ class LocalFileStore(FileStore):
                 rpath = os.path.relpath( path, os.path.join( self.root, pathPrefix ) )
                 results.append( rpath )
         return results
-            
-        
 
-    
+    def mkPath( self, *elements):
+        return os.path.join(*elements)
+

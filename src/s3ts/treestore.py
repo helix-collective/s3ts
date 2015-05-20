@@ -49,7 +49,7 @@ class TreeStore(object):
         """
         packageFiles = self.__storeFiles( self.pkgStore, localPath, progressCB )
         pkg = package.Package( treeName, creationTime, packageFiles )
-        self.pkgStore.putToJson( self.__treeNamePath( treeName ), pkg, package.PackageJS() )
+        self.pkgStore.putToJson( self.__treeNamePath( self.pkgStore, treeName ), pkg, package.PackageJS() )
         return pkg
 
     def uploadMany( self, treeName, creationTime, commonLocalPath, variantsLocalPath, progressCB ):
@@ -69,11 +69,11 @@ class TreeStore(object):
                 # merge the common + indivisual package
                 mergedPackageFiles = packageFiles + indivisualPackageFiles
                 pkg = package.Package( variantTreeName, creationTime, mergedPackageFiles)
-                self.pkgStore.putToJson( self.__treeNamePath( variantTreeName ), pkg, package.PackageJS() )
+                self.pkgStore.putToJson( self.__treeNamePath( self.pkgStore, variantTreeName ), pkg, package.PackageJS() )
 
     def find( self, treeName ):
         """Return the package definition for the given name"""
-        return self.pkgStore.getFromJson( self.__treeNamePath( treeName ), package.PackageJS() )
+        return self.pkgStore.getFromJson( self.__treeNamePath( self.pkgStore, treeName ), package.PackageJS() )
 
     def list( self ):
         """Returns the available packages names"""
@@ -83,7 +83,7 @@ class TreeStore(object):
         """confirms that all data for the given package is present in the store"""
         for pf in pkg.files:
             for chunk in pf.chunks:
-                cpath = self.__chunkPath( chunk.sha1, chunk.encoding ) 
+                cpath = self.__chunkPath( self.pkgStore, chunk.sha1, chunk.encoding )
                 if not self.pkgStore.exists( cpath ):
                     raise RuntimeError, "{0} not found".format(cpath)
 
@@ -91,7 +91,7 @@ class TreeStore(object):
         """confirms that all data for the given package is present in the local cache"""
         for pf in pkg.files:
             for chunk in pf.chunks:
-                cpath = self.__chunkPath( chunk.sha1, chunk.encoding ) 
+                cpath = self.__chunkPath( self.localCache, chunk.sha1, chunk.encoding )
                 if not self.localCache.exists( cpath ):
                     raise RuntimeError, "{0} not found".format(cpath)
 
@@ -103,13 +103,15 @@ class TreeStore(object):
         """
         for pf in pkg.files:
             for chunk in pf.chunks:
-                cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
-                if self.localCache.exists( cpath ):
+                cpath = self.__chunkPath( self.pkgStore, chunk.sha1, chunk.encoding )
+                lpath = self.__chunkPath( self.localCache, chunk.sha1, chunk.encoding )
+
+                if self.localCache.exists( lpath ):
                     progressCB( 0, chunk.size )
                 else:
                     buf = self.pkgStore.get( cpath )
                     self.__checkSha1( self.__decompress( buf, chunk.encoding ), chunk.sha1, cpath )
-                    self.localCache.put( cpath, buf )
+                    self.localCache.put( lpath, buf )
                     progressCB( chunk.size, 0 )
 
     def downloadHttp( self, pkg, progressCB ):
@@ -121,15 +123,16 @@ class TreeStore(object):
         """
         for pf in pkg.files:
             for chunk in pf.chunks:
-                cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
-                if self.localCache.exists( cpath ):
+                lpath = self.__chunkPath( self.localCache, chunk.sha1, chunk.encoding )
+
+                if self.localCache.exists( lpath ):
                     progressCB( 0, chunk.size )
                 else:
                     resp = requests.get( chunk.url )
                     resp.raise_for_status()
                     buf = resp.content
-                    self.__checkSha1( self.__decompress( buf, chunk.encoding ), chunk.sha1, cpath )
-                    self.localCache.put( cpath, buf )
+                    self.__checkSha1( self.__decompress( buf, chunk.encoding ), chunk.sha1, lpath )
+                    self.localCache.put( lpath, buf )
                     progressCB( chunk.size, 0 )
 
     def install( self, pkg, localPath, progressCB ):
@@ -152,7 +155,7 @@ class TreeStore(object):
                 filesha1 = hashlib.sha1()
                 with tempfile.NamedTemporaryFile(delete=False,dir=targetDir) as f:
                     for chunk in pf.chunks:
-                        cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
+                        cpath = self.__chunkPath( self.localCache, chunk.sha1, chunk.encoding )
                         buf = self.localCache.get( cpath )
                         buf = self.__decompress( buf, chunk.encoding )
                         filesha1.update( buf )
@@ -174,7 +177,7 @@ class TreeStore(object):
         """Update the given package so that it can be accessed directly via pre-signed http urls"""
         for pf in pkg.files:
             for chunk in pf.chunks:
-                cpath = self.__chunkPath( chunk.sha1, chunk.encoding )
+                cpath = self.__chunkPath( self.pkgStore, chunk.sha1, chunk.encoding )
                 chunk.url = self.pkgStore.url( cpath, expiresInSecs )
 
     def prime( self, localPath, progressCB ):
@@ -207,11 +210,13 @@ class TreeStore(object):
                 if self.config.useCompression:
                     buf,encoding = self.__compress( buf )
                 chunks.append( self.__storeChunk( store, chunksha1.hexdigest(), encoding, buf, size, progressCB ) )
-
+        #make the package path consistent and have only forward slash
+        rpath = rpath.replace("\\", "/")
         return package.PackageFile( filesha1.hexdigest(), rpath, chunks )
 
     def __storeChunk( self, store, sha1, encoding, buf, size, progressCB ):
-        cpath = self.__chunkPath( sha1, encoding )
+        cpath = self.__chunkPath( store, sha1, encoding )
+
         if store.exists( cpath ):
             progressCB( 0, size )
         else:
@@ -219,15 +224,15 @@ class TreeStore(object):
             progressCB( size, 0 )
         return package.FileChunk( sha1, size, encoding, None )
 
-    def __treeNamePath( self, treeName ):
-        return os.path.join( TREES_PATH, treeName )
-            
-    def __chunkPath( self, sha1, encoding ):
+    def __treeNamePath( self, store, treeName ):
+        return store.mkPath( TREES_PATH, treeName )
+
+    def __chunkPath( self, store, sha1, encoding ):
         enc = {
             package.ENCODING_RAW : 'raw',
             package.ENCODING_ZLIB : 'zlib',
         }[encoding]
-        return os.path.join( 'chunks', enc, sha1[:2], sha1[2:] )
+        return store.mkPath(  'chunks', enc, sha1[:2], sha1[2:] )
 
     def __compress( self, buf ):
         bufz = zlib.compress( buf )
