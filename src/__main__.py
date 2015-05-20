@@ -22,7 +22,8 @@ class UploadProgress(object):
     def __call__( self, nDownloaded, nCached ):
         self.cumTransferred += nDownloaded
         self.cumCached += nCached
-        print "\r{0}+{1} bytes transferred".format( self.cumTransferred, self.cumCached ),
+        sys.stdout.write( "\r{0}+{1} bytes transferred".format( self.cumTransferred, self.cumCached ) )
+        sys.stdout.flush()
 
 class DownloadProgress(object):
     def __init__( self, pkg ):
@@ -33,8 +34,9 @@ class DownloadProgress(object):
     def __call__( self, nDownloaded, nCached ):
         self.cumTransferred += nDownloaded
         self.cumCached += nCached
-        print "\r{0}+{1}/{2} bytes downloaded".format( self.cumTransferred, self.cumCached, self.size ),
-
+        sys.stdout.write( "\r{0}+{1}/{2} bytes downloaded".format( self.cumTransferred, self.cumCached, self.size ) )
+        sys.stdout.flush()
+        
 class InstallProgress(object):
     def __init__( self, pkg ):
         self.size = pkg.size()
@@ -42,7 +44,8 @@ class InstallProgress(object):
 
     def __call__( self, nbytes ):
         self.cumSize += nbytes
-        print "\r{0}/{1} bytes installed".format( self.cumSize, self.size ),
+        sys.stdout.write( "\r{0}/{1} bytes installed".format( self.cumSize, self.size ) )
+        sys.stdout.flush()
         
 def connectToBucket():
     awsAccessKeyId = getEnv( 'AWS_ACCESS_KEY_ID', 'the AWS access key id' )

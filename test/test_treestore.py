@@ -112,12 +112,12 @@ class TestTreeStore(unittest.TestCase):
         #
         #   AWS_ACCESS_KEY_ID
         #   AWS_SECRET_ACCESS_KEY
-        #   TS_TEST_S3_BUCKET
+        #   S3TS_BUCKET
         #
         # NB: **this will only work if the bucket is empty
 
         s3c = boto.connect_s3()
-        bucket = s3c.get_bucket( os.environ['TS_TEST_S3_BUCKET'] )
+        bucket = s3c.get_bucket( os.environ['S3TS_BUCKET'] )
 
         with EmptyS3Bucket(bucket):
             fileStore = S3FileStore( bucket )
