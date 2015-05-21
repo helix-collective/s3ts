@@ -36,7 +36,7 @@ class DownloadProgress(object):
         self.cumCached += nCached
         sys.stdout.write( "\r{0}+{1}/{2} bytes downloaded".format( self.cumTransferred, self.cumCached, self.size ) )
         sys.stdout.flush()
-        
+
 class InstallProgress(object):
     def __init__( self, pkg ):
         self.size = pkg.size()
@@ -46,14 +46,14 @@ class InstallProgress(object):
         self.cumSize += nbytes
         sys.stdout.write( "\r{0}/{1} bytes installed".format( self.cumSize, self.size ) )
         sys.stdout.flush()
-        
+
 def connectToBucket():
     awsAccessKeyId = getEnv( 'AWS_ACCESS_KEY_ID', 'the AWS access key id' )
     awsSecretAccessKey = getEnv( 'AWS_SECRET_ACCESS_KEY', 'the AWS secret access key' )
     bucketName = getEnv( 'S3TS_BUCKET', 'the AWS S3 bucket used for tree storage'  )
     s3c = boto.connect_s3(awsAccessKeyId,awsSecretAccessKey)
     return s3c.get_bucket( bucketName )
-    
+
 def createTreeStore(chunksize):
     localCacheDir = getEnv( 'S3TS_LOCALCACHE', 'the local directory used for caching'  )
     bucket = connectToBucket()
@@ -76,7 +76,7 @@ def readPackageFile( packageFile ):
 
 def init( chunksize ):
     treeStore = createTreeStore(chunksize)
-    
+
 def list():
     treeStore = openTreeStore()
     for treeName in treeStore.list():
@@ -113,6 +113,7 @@ def download( treename ):
 def install( treename, localdir ):
     treeStore = openTreeStore()
     pkg = treeStore.find( treename )
+    treeStore.download( pkg, DownloadProgress(pkg) )
     treeStore.verifyLocal( pkg )
     treeStore.install( pkg, localdir, InstallProgress(pkg) )
     print
@@ -122,7 +123,7 @@ def presign( treename, expirySecs ):
     pkg = treeStore.find( treename )
     treeStore.addUrls( pkg, expirySecs )
     print json.dumps( PackageJS().toJson(pkg), sort_keys=True, indent=2, separators=(',', ': ') )
-    
+
 def downloadHttp( packageFile ):
     treeStore = nonS3TreeStore()
     pkg = readPackageFile( packageFile )
@@ -160,7 +161,7 @@ upload_parser.add_argument('localdir', action='store', help='The local directory
 download_parser = subparsers.add_parser('download', help='Download a tree to the local cache')
 download_parser.add_argument('treename', action='store', help='The name of the tree')
 
-install_parser = subparsers.add_parser('install', help='Install a tree into the filesystem')
+install_parser = subparsers.add_parser('install', help='Download/Install a tree into the filesystem')
 install_parser.add_argument('treename', action='store', help='The name of the tree')
 install_parser.add_argument('localdir', action='store', help='The local directory path')
 
