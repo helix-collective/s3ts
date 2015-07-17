@@ -10,7 +10,7 @@ TREES_PATH = 'trees'
 class TreeStore(object):
     """implements a directory tree store
 
-    This class implements a simple directory tree storage mechanism. It supports 
+    This class implements a simple directory tree storage mechanism. It supports
     uploading and downloading of multiple directory trees, with data chunking,
     and de-duplication. A local cache is kept for download optimisation.
     """
@@ -34,7 +34,7 @@ class TreeStore(object):
     def forHttpOnly( cls, localCache ):
         """create a treestore that only supports the downloadHttp method"""
         return cls( None, localCache, None )
-    
+
     def __init__( self, pkgStore, localCache, config ):
         self.pkgStore = pkgStore
         self.localCache = localCache
@@ -78,6 +78,19 @@ class TreeStore(object):
     def list( self ):
         """Returns the available packages names"""
         return self.pkgStore.list( TREES_PATH )
+
+    def remove( self, treeName ):
+        """Removes a tree from the store"""
+        return self.pkgStore.remove( self.__treeNamePath( self.pkgStore, treeName ) )
+
+    def rename( self, fromTreeName, toTreeName ):
+        """Renames a tree in the store"""
+        fromPath = self.__treeNamePath( self.pkgStore, fromTreeName )
+        toPath = self.__treeNamePath( self.pkgStore, toTreeName )
+        pkg = self.pkgStore.getFromJson( fromPath, package.PackageJS() )
+        pkg.name = toTreeName
+        self.pkgStore.putToJson( toPath, pkg, package.PackageJS() )
+        self.pkgStore.remove( fromPath )
 
     def verify( self, pkg ):
         """confirms that all data for the given package is present in the store"""
@@ -142,11 +155,11 @@ class TreeStore(object):
 
         """
         installTime = datetime.datetime.now()
-        
+
         for pf in pkg.files:
             targetPath = os.path.join( localPath, pf.path )
             targetDir = os.path.dirname(targetPath)
-                
+
             if not os.path.exists( targetDir ):
                 os.makedirs( targetDir )
 
@@ -183,7 +196,7 @@ class TreeStore(object):
     def prime( self, localPath, progressCB ):
         """Walk a local directory tree and ensure that all chunks of all files are present in the local cache"""
         self.__storeFiles( self.localCache, localPath, progressCB )
-        
+
     def __storeFiles( self, store, localPath, progressCB ):
         if not os.path.isdir( localPath ):
             raise IOError( "directory {0} doesn't exist".format( localPath ) )
@@ -252,4 +265,3 @@ class TreeStore(object):
         csha1.update( buf )
         if csha1.hexdigest() != sha1:
             raise RuntimeError, "sha1 for {0} doesn't match".format( cpath )
-        

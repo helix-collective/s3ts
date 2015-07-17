@@ -23,6 +23,5 @@ s3ts install src-1.0 $TEST_DIR/src-1.0
 s3ts install test $TEST_DIR/test
 s3ts list
 s3ts info src-1.0
-
-
-
+s3ts rename src-1.0 src-1.1
+s3ts remove --yes src-1.1

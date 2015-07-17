@@ -82,6 +82,21 @@ def list():
     for treeName in treeStore.list():
         print treeName
 
+def remove( treename, confirmed ):
+    if not confirmed:
+        s = raw_input( "Really remove tree '{}' (Y/N) ? [N] ".format(treename) )
+        confirmed = s =='Y'
+    if confirmed:
+        print "Removing {}".format( treename )
+        treestore = openTreeStore()
+        treestore.remove( treename )
+    else:
+        print "Cancelled"
+
+def rename( fromtreename, totreename ):
+    treestore = openTreeStore()
+    treestore.rename( fromtreename, totreename )
+
 def info( treename ):
     treeStore = openTreeStore()
     pkg = treeStore.find( treename )
@@ -151,6 +166,14 @@ init_parser.add_argument('--chunksize', action='store', default=10000000, type=i
 
 list_parser = subparsers.add_parser('list', help='List trees available in the store')
 
+remove_parser = subparsers.add_parser( 'remove', help='Remove a tree from the store')
+remove_parser.add_argument( "--yes", action='store_true', help='Dont ask for confirmation' )
+remove_parser.add_argument('treename', action='store', help='The name of the tree')
+
+rename_parser = subparsers.add_parser( 'rename', help='Rename an existing tree in the sore')
+rename_parser.add_argument('fromtreename', action='store', help='The name of the src tree')
+rename_parser.add_argument('totreename', action='store', help='The name of the target tree')
+
 info_parser = subparsers.add_parser('info', help='Show information about a tree')
 info_parser.add_argument('treename', action='store', help='The name of the tree')
 
@@ -191,6 +214,10 @@ def main():
         init( args.chunksize )
     elif args.commandName == 'list':
         list()
+    elif args.commandName == 'remove':
+        remove( args.treename, args.yes )
+    elif args.commandName == 'rename':
+        rename( args.fromtreename, args.totreename )
     elif args.commandName == 'info':
         info( args.treename )
     elif args.commandName == 'upload':

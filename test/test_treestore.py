@@ -9,6 +9,8 @@ from s3ts.utils import datetimeFromIso
 import boto
 import logging
 
+# boto.set_stream_logger('boto')
+
 class CaptureDownloadProgress:
     def __init__( self ):
         self.recorded = []
@@ -111,6 +113,17 @@ class TestTreeStore(unittest.TestCase):
         # Check that the installed tree is the same as the source tree
         self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
 
+        # Rename the tree, and check that installing that is the same
+        treestore.rename( 'v1.0', 'v1.0x' )
+        pkg = treestore.find( 'v1.0x' )
+        treestore.download( pkg, CaptureDownloadProgress() )
+        destTree = os.path.join( self.workdir, 'dest-2' )
+        treestore.install( pkg, destTree, CaptureInstallProgress() )
+        self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
+
+        # Remove the tree
+        treestore.remove( 'v1.0x' )
+
     def test_s3_treestore(self):
         # Create an s3 backed treestore
         # Requires these environment variables set
@@ -164,17 +177,28 @@ class TestTreeStore(unittest.TestCase):
             # And download it directly via http. Create a new local cache
             # to ensure that we actually redownload each chunk
             localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
-            treestore = TreeStore.forHttpOnly( localCache )
+            treestore2 = TreeStore.forHttpOnly( localCache )
             cb = CaptureDownloadProgress()
-            treestore.downloadHttp( pkg, cb )
+            treestore2.downloadHttp( pkg, cb )
             self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
 
             # Install it
             destTree2 = os.path.join( self.workdir, 'dest-2' )
-            treestore.install( pkg, destTree2, CaptureInstallProgress() )
+            treestore2.install( pkg, destTree2, CaptureInstallProgress() )
 
             # Check that the new installed tree is the same as the source tree
             self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree2), shell=True ), 0 )
+
+            # Rename the tree, and check that installing that is the same
+            treestore.rename( 'v1.0', 'v1.0x' )
+            pkg = treestore.find( 'v1.0x' )
+            treestore.download( pkg, CaptureDownloadProgress() )
+            destTree = os.path.join( self.workdir, 'dest-2' )
+            treestore.install( pkg, destTree, CaptureInstallProgress() )
+            self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
+
+            # Remove the tree
+            treestore.remove( 'v1.0x' )
 
     def test_s3_many_treestore(self):
         # Create an s3 backed treestore

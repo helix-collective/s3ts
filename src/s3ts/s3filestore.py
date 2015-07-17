@@ -29,6 +29,10 @@ class S3FileStore(FileStore):
     def list( self, pathPrefix ):
         return [os.path.relpath(key.name,pathPrefix) for key in self.bucket.list(prefix=pathPrefix)]
 
+    def remove( self, path ):
+        k = Key(self.bucket,path)
+        k.delete()
+
     def url( self, path, expiresInSecs ):
         k = Key(self.bucket,path)
         return k.generate_url(expiresInSecs)

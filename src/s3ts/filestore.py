@@ -5,7 +5,6 @@ class FileStore(object):
     def exists( self, path ):
         """Returns true if a file with the given file exists"""
         raise RuntimeError, "Not implemented"
-        
 
     def get( self, path ):
         """Get the value associated with path
@@ -22,13 +21,18 @@ class FileStore(object):
         """
         raise RuntimeError, "Not implemented"
 
+    def remove( self, path ):
+        """Remove a value with the path, if it exists
+        """
+        raise RuntimeError, "Not implemented"
+
     def list( self, pathPrefix ):
         """Return all paths having the specified path prefix"""
         raise RuntimeError, "Not implemented"
 
     def getFromJson( self, path, jscoder ):
         return jscoder.fromJson( json.loads( self.get(path) ) )
-        
+
     def putToJson( self, path, v, jscoder ):
         return self.put( path, json.dumps( jscoder.toJson(v) ) )
 
@@ -37,7 +41,7 @@ class FileStore(object):
 
     def mkPath( self, *elements):
         raise RuntimeError, "Not implemented"
-    
+
 class LocalFileStore(FileStore):
     """implements the FileStore interface using the local file system"""
 
@@ -69,6 +73,11 @@ class LocalFileStore(FileStore):
             f.write(body)
         os.rename( f.name, path )
 
+    def remove( self, path ):
+        path = self.__path(path)
+        if os.path.exists( path ):
+            os.unlink(path)
+
     def list( self, pathPrefix ):
         results = []
         for dir0, dirs, files in os.walk(self.__path(pathPrefix)):
@@ -80,4 +89,3 @@ class LocalFileStore(FileStore):
 
     def mkPath( self, *elements):
         return os.path.join(*elements)
-
