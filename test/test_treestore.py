@@ -44,8 +44,7 @@ class EmptyS3Bucket:
 class TestTreeStore(unittest.TestCase):
 
     def setUp(self):
-        # self.workdir = tempfile.mkdtemp()
-        self.workdir = "/tmp/test"
+        self.workdir = tempfile.mkdtemp()
         if os.path.exists( self.workdir ):
             shutil.rmtree( self.workdir )
         os.makedirs( self.workdir )
@@ -75,8 +74,7 @@ class TestTreeStore(unittest.TestCase):
         fs.put( 'kiosk-02/key', 'this is the key src1:kiosk-02' )
 
     def tearDown(self):
-        # shutil.rmtree( self.workdir )
-        pass
+        shutil.rmtree( self.workdir )
 
     def test_fs_treestore(self):
         # Create a file system backed treestore
@@ -99,9 +97,13 @@ class TestTreeStore(unittest.TestCase):
         treestore.prime( self.srcTree2, CaptureUploadProgress() )
 
         # Download it, checking we get expected progress callbacks
+        # The order of the callbacks will depend on the order of the
+        # chunks in the package definition, which will depend on the
+        # iteration order of the file system when the package was created.
+        # So check independently of ordering.
         cb = CaptureDownloadProgress()
         treestore.download( pkg, cb )
-        self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
+        self.assertEquals( sorted(cb.recorded), [30, 45, 47, 100, 100] )
 
         # Verify it locally
         treestore.verifyLocal( pkg )
@@ -156,7 +158,7 @@ class TestTreeStore(unittest.TestCase):
             # Download it, checking we get expected progress callbacks
             cb = CaptureDownloadProgress()
             treestore.download( pkg, cb )
-            self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
+            self.assertEquals( sorted(cb.recorded), [30, 45, 47, 100, 100] )
 
             # Verify it locally
             treestore.verifyLocal( pkg )
@@ -180,7 +182,7 @@ class TestTreeStore(unittest.TestCase):
             treestore2 = TreeStore.forHttpOnly( localCache )
             cb = CaptureDownloadProgress()
             treestore2.downloadHttp( pkg, cb )
-            self.assertEquals( cb.recorded, [100, 100, 30, 45, 47] )
+            self.assertEquals( sorted(cb.recorded), [30, 45, 47, 100, 100] )
 
             # Install it
             destTree2 = os.path.join( self.workdir, 'dest-2' )
@@ -232,7 +234,7 @@ class TestTreeStore(unittest.TestCase):
             # Download it, checking we get expected progress callbacks
             cb = CaptureDownloadProgress()
             treestore.download( pkg, cb )
-            self.assertEquals( cb.recorded, [100, 100, 30, 45, 47, 29] )
+            self.assertEquals( sorted(cb.recorded), [29, 30, 45, 47, 100, 100] )
 
             # Verify it locally
             treestore.verifyLocal( pkg )
