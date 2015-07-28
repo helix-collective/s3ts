@@ -39,6 +39,15 @@ class TreeStore(object):
         self.pkgStore = pkgStore
         self.localCache = localCache
         self.config = config
+        self.dryRun = False
+
+    def setDryRun( self, dryRun ):
+        """Set the dryRun flag.
+
+        Uploads will not push any data to S3. Downloads will
+        retrieve package files, but no check data.
+        """
+        self.dryRun = dryRun
 
     def upload( self, treeName, creationTime, localPath, progressCB ):
         """Creates a package for the content of localPath.
@@ -49,7 +58,8 @@ class TreeStore(object):
         """
         packageFiles = self.__storeFiles( self.pkgStore, localPath, progressCB )
         pkg = package.Package( treeName, creationTime, packageFiles )
-        self.pkgStore.putToJson( self.__treeNamePath( self.pkgStore, treeName ), pkg, package.PackageJS() )
+        if not self.dryRun:
+            self.pkgStore.putToJson( self.__treeNamePath( self.pkgStore, treeName ), pkg, package.PackageJS() )
         return pkg
 
     def uploadMany( self, treeName, creationTime, commonLocalPath, variantsLocalPath, progressCB ):
@@ -122,9 +132,10 @@ class TreeStore(object):
                 if self.localCache.exists( lpath ):
                     progressCB( 0, chunk.size )
                 else:
-                    buf = self.pkgStore.get( cpath )
-                    self.__checkSha1( self.__decompress( buf, chunk.encoding ), chunk.sha1, cpath )
-                    self.localCache.put( lpath, buf )
+                    if not self.dryRun:
+                        buf = self.pkgStore.get( cpath )
+                        self.__checkSha1( self.__decompress( buf, chunk.encoding ), chunk.sha1, cpath )
+                        self.localCache.put( lpath, buf )
                     progressCB( chunk.size, 0 )
 
     def downloadHttp( self, pkg, progressCB ):
@@ -233,7 +244,8 @@ class TreeStore(object):
         if store.exists( cpath ):
             progressCB( 0, size )
         else:
-            store.put( cpath, buf )
+            if not self.dryRun:
+                store.put( cpath, buf )
             progressCB( size, 0 )
         return package.FileChunk( sha1, size, encoding, None )
 
