@@ -47,6 +47,10 @@ class InstallProgress(object):
         sys.stdout.write( "\r{0} / {1} installed".format( self.cumSize, self.size ) )
         sys.stdout.flush()
 
+def outVerbose( formatStr, *args ):
+    sys.stdout.write( "\r" + formatStr.format(*args) + "\n" )
+    sys.stdout.flush()
+
 def connectToBucket():
     awsAccessKeyId = getEnv( 'AWS_ACCESS_KEY_ID', 'the AWS access key id' )
     awsSecretAccessKey = getEnv( 'AWS_SECRET_ACCESS_KEY', 'the AWS secret access key' )
@@ -60,10 +64,14 @@ def createTreeStore(chunksize):
     config = TreeStoreConfig( chunksize, True )
     return TreeStore.create( S3FileStore(bucket), LocalFileStore(localCacheDir), config )
 
-def openTreeStore():
+def openTreeStore(dryRun=False,verbose=False):
     localCacheDir = getEnv( 'S3TS_LOCALCACHE', 'the local directory used for caching'  )
     bucket = connectToBucket()
-    return TreeStore.open( S3FileStore(bucket), LocalFileStore(localCacheDir) )
+    treeStore = TreeStore.open( S3FileStore(bucket), LocalFileStore(localCacheDir) )
+    treeStore.setDryRun(dryRun)
+    if verbose:
+        treeStore.setOutVerbose( outVerbose )
+    return treeStore
 
 def nonS3TreeStore():
     # Don't use or require S3 - some operations won't be available
@@ -107,10 +115,9 @@ def info( treename ):
     for pf in pkg.files:
         print '    {0} ({1} chunks, {2} bytes)'.format( pf.path, len(pf.chunks), pf.size() )
 
-def upload( treename, localdir, dryRun ):
+def upload( treename, localdir, dryRun, verbose ):
     creationTime = datetime.datetime.now()
-    treeStore = openTreeStore()
-    treeStore.setDryRun(dryRun)
+    treeStore = openTreeStore(dryRun=dryRun,verbose=verbose)
     treeStore.upload( treename, creationTime, localdir, UploadProgress() )
     print
 
@@ -120,15 +127,14 @@ def uploadMany( treename, localdir, kioskDir ):
     treeStore.uploadMany(treename, creationTime, localdir, kioskDir, UploadProgress())
     print
 
-def download( treename, dryRun ):
-    treeStore = openTreeStore()
-    treeStore.setDryRun(dryRun)
+def download( treename, dryRun, verbose ):
+    treeStore = openTreeStore(dryRun=dryRun,verbose=verbose)
     pkg = treeStore.find( treename )
     treeStore.download( pkg, DownloadProgress(pkg) )
     print
 
-def install( treename, localdir ):
-    treeStore = openTreeStore()
+def install( treename, localdir, verbose ):
+    treeStore = openTreeStore(verbose=verbose)
     pkg = treeStore.find( treename )
     treeStore.download( pkg, DownloadProgress(pkg) )
     print
@@ -181,17 +187,21 @@ p = subparsers.add_parser('info', help='Show information about a tree')
 p.add_argument('treename', action='store', help='The name of the tree')
 
 p = subparsers.add_parser('upload', help='Upload a tree from the local filesystem')
-p.set_defaults(dryRun=False)
+p.set_defaults(dryRun=False,verbose=False)
 p.add_argument('--dry-run', dest='dryRun', action='store_true')
+p.add_argument('--verbose', dest='verbose', action='store_true')
 p.add_argument('treename', action='store', help='The name of the tree')
 p.add_argument('localdir', action='store', help='The local directory path')
 
 p = subparsers.add_parser('download', help='Download a tree to the local cache')
-p.set_defaults(dryRun=False)
+p.set_defaults(dryRun=False,verbose=False)
 p.add_argument('--dry-run', dest='dryRun', action='store_true')
+p.add_argument('--verbose', dest='verbose', action='store_true')
 p.add_argument('treename', action='store', help='The name of the tree')
 
 p = subparsers.add_parser('install', help='Download/Install a tree into the filesystem')
+p.set_defaults(verbose=False)
+p.add_argument('--verbose', dest='verbose', action='store_true')
 p.add_argument('treename', action='store', help='The name of the tree')
 p.add_argument('localdir', action='store', help='The local directory path')
 
@@ -228,11 +238,11 @@ def main():
     elif args.commandName == 'info':
         info( args.treename )
     elif args.commandName == 'upload':
-        upload( args.treename, args.localdir, args.dryRun )
+        upload( args.treename, args.localdir, args.dryRun, args.verbose )
     elif args.commandName == 'download':
-        download( args.treename, args.dryRun )
+        download( args.treename, args.dryRun, args.verbose )
     elif args.commandName == 'install':
-        install( args.treename, args.localdir )
+        install( args.treename, args.localdir, args.verbose )
     elif args.commandName == 'presign':
         presign( args.treename, args.expirySecs )
     elif args.commandName == 'download-http':

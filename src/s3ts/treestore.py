@@ -40,6 +40,7 @@ class TreeStore(object):
         self.localCache = localCache
         self.config = config
         self.dryRun = False
+        self.outVerbose = lambda *args : None
 
     def setDryRun( self, dryRun ):
         """Set the dryRun flag.
@@ -48,6 +49,14 @@ class TreeStore(object):
         retrieve package files, but no check data.
         """
         self.dryRun = dryRun
+
+    def setOutVerbose( self, outVerbose ):
+        """Set the function to generate verbose output
+
+        The supplied function must take a format string, with additional
+        format arguments.
+        """
+        self.outVerbose = outVerbose
 
     def upload( self, treeName, creationTime, localPath, progressCB ):
         """Creates a package for the content of localPath.
@@ -59,6 +68,7 @@ class TreeStore(object):
         packageFiles = self.__storeFiles( self.pkgStore, localPath, progressCB )
         pkg = package.Package( treeName, creationTime, packageFiles )
         if not self.dryRun:
+            self.outVerbose( "Uploading package definition for {}", treeName )
             self.pkgStore.putToJson( self.__treeNamePath( self.pkgStore, treeName ), pkg, package.PackageJS() )
         return pkg
 
@@ -133,6 +143,7 @@ class TreeStore(object):
                     progressCB( 0, chunk.size )
                 else:
                     if not self.dryRun:
+                        self.outVerbose( "Fetching chunk {} to local cache", chunk.sha1 )
                         buf = self.pkgStore.get( cpath )
                         self.__checkSha1( self.__decompress( buf, chunk.encoding ), chunk.sha1, cpath )
                         self.localCache.put( lpath, buf )
@@ -189,6 +200,7 @@ class TreeStore(object):
                 if filesha1.hexdigest() != pf.sha1:
                     raise RuntimeError, "sha1 for {0} doesn't match".format(pf.path)
 
+                self.outVerbose( "Installing {}", targetPath )
                 os.rename( f.name, targetPath )
             except:
                 if f: os.unlink( f.name )
@@ -221,6 +233,7 @@ class TreeStore(object):
     def __storeFile( self, store, root, rpath, progressCB ):
         filesha1 = hashlib.sha1()
         chunks = []
+        self.outVerbose( "Processing file {}", rpath )
         with open( os.path.join( root, rpath ), 'rb' ) as f:
             while True:
                 buf = f.read( self.config.chunkSize )
@@ -234,6 +247,7 @@ class TreeStore(object):
                 if self.config.useCompression:
                     buf,encoding = self.__compress( buf )
                 chunks.append( self.__storeChunk( store, chunksha1.hexdigest(), encoding, buf, size, progressCB ) )
+        self.outVerbose( "file {} has hash {}", rpath, filesha1.hexdigest() )
         #make the package path consistent and have only forward slash
         rpath = rpath.replace("\\", "/")
         return package.PackageFile( filesha1.hexdigest(), rpath, chunks )
@@ -245,6 +259,7 @@ class TreeStore(object):
             progressCB( 0, size )
         else:
             if not self.dryRun:
+                self.outVerbose( "Uploading {} chunk with hash {}", encoding, sha1  )
                 store.put( cpath, buf )
             progressCB( size, 0 )
         return package.FileChunk( sha1, size, encoding, None )

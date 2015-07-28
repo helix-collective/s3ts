@@ -16,13 +16,13 @@ s3ts() {
 s3ts init
 s3ts upload --dry-run src-1.0 src
 s3ts upload src-1.0 src
-s3ts upload test test
+s3ts upload --verbose test test
 s3ts prime-cache src
 s3ts download --dry-run src-1.0
 s3ts download src-1.0
-s3ts download test
+s3ts download --verbose test
 s3ts install src-1.0 $TEST_DIR/src-1.0
-s3ts install test $TEST_DIR/test
+s3ts install --verbose test $TEST_DIR/test
 s3ts list
 s3ts info src-1.0
 s3ts rename src-1.0 src-1.1
