@@ -42,6 +42,18 @@ class FileStore(object):
     def mkPath( self, *elements):
         raise RuntimeError, "Not implemented"
 
+    def getMetadata( self, path):
+        raise RuntimeError, "Not implemented"
+
+class FileMetaData:
+    def __init__(self,size,lastModified):
+        self.size = size
+        self.lastModified = lastModified
+    def __repr__(self):
+        return self.__str__()
+    def __str__(self):
+        return "size:" + str(self.size) + " mtime:" + str(self.lastModified) 
+
 class LocalFileStore(FileStore):
     """implements the FileStore interface using the local file system"""
 
@@ -89,3 +101,13 @@ class LocalFileStore(FileStore):
 
     def mkPath( self, *elements):
         return os.path.join(*elements)
+
+    def getMetadata(self, path):
+        """Returns the size and update time for the given path
+           Raises a KeyError if the path doesn't exist
+        """
+        statinfo = os.stat(self.__path(path))
+        return FileMetaData(statinfo.st_size, statinfo.st_mtime)
+
+
+

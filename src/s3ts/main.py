@@ -156,6 +156,10 @@ def primeCache( localdir ):
     treeStore = openTreeStore()
     treeStore.prime( localdir, UploadProgress() )
 
+def validateCache():
+    treeStore = openTreeStore()
+    print treeStore.validateLocalCache()
+
 parser = argparse.ArgumentParser()
 
 subparsers = parser.add_subparsers(help='commands',dest='commandName')
@@ -208,6 +212,8 @@ upload_many_parser.add_argument('treename', action='store', help='The name of th
 upload_many_parser.add_argument('localdir', action='store', help='The local directory path')
 upload_many_parser.add_argument('local_variant_dir', action='store', help='The local variant path')
 
+validate_local_cache_parser = subparsers.add_parser('validate-local-cache', help='Validates the local cache')
+
 def main():
     args = parser.parse_args()
     if args.commandName == 'init':
@@ -236,6 +242,8 @@ def main():
         primeCache( args.localdir )
     elif args.commandName == 'upload-many':
         uploadMany(args.treename, args.localdir, args.local_variant_dir)
+    elif args.commandName == 'validate-local-cache':
+        validateCache()
 
 if __name__ == '__main__':
     main()

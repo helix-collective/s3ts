@@ -1,4 +1,4 @@
-import os, hashlib, zlib, tempfile, datetime
+import os, hashlib, zlib, tempfile, datetime, time
 import requests
 
 from s3ts.config import TreeStoreConfig, TreeStoreConfigJS, InstallProperties, writeInstallProperties
@@ -196,6 +196,31 @@ class TreeStore(object):
     def prime( self, localPath, progressCB ):
         """Walk a local directory tree and ensure that all chunks of all files are present in the local cache"""
         self.__storeFiles( self.localCache, localPath, progressCB )
+
+    def validateLocalCache(self):
+        return self.__validateStore( self.localCache )
+
+    def validateStore(self):
+        return self.__validateStore( self.store )
+
+    def __validateStore( self, fileStore ):
+        """Walk a local cache directory tree and ensure that all chunks are valid sha1 """
+        fileList = fileStore.list("")
+        corruptedFiles = []
+        for fileName in fileList:
+            token = fileName.rsplit('/', 2)
+            sha1 = token[1] + token[2]
+            encoding = package.ENCODING_RAW
+            if "zlib" in fileName:
+                encoding = package.ENCODING_ZLIB
+
+            buf = fileStore.get(fileName)
+            try:
+                self.__checkSha1(self.__decompress(buf, encoding), sha1, fileName)
+            except:
+                corruptedFiles.append({fileName, fileStore.getMetadata(fileName)})
+        return corruptedFiles
+
 
     def __storeFiles( self, store, localPath, progressCB ):
         if not os.path.isdir( localPath ):

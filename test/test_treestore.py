@@ -96,6 +96,10 @@ class TestTreeStore(unittest.TestCase):
         # Test the cache priming function
         treestore.prime( self.srcTree2, CaptureUploadProgress() )
 
+        # Test whether the verifyCache works
+        corruptedFiles = treestore.validateLocalCache()
+        self.assertEquals( len(corruptedFiles), 0) 
+        
         # Download it, checking we get expected progress callbacks
         # The order of the callbacks will depend on the order of the
         # chunks in the package definition, which will depend on the
