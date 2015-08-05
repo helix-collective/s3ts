@@ -83,6 +83,11 @@ class LocalFileStore(FileStore):
         # final filename, in an attempt to get atomic updates
         with tempfile.NamedTemporaryFile( dir=os.path.dirname(path), delete=False ) as f:
             f.write(body)
+            # Need to flush both at libc and kernel layers here to
+            # ensure that the os.rename() below works correctly under
+            # windows
+            f.flush()
+            os.fsync(f.fileno())
         os.rename( f.name, path )
 
     def remove( self, path ):

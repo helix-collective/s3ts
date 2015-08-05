@@ -197,6 +197,13 @@ class TreeStore(object):
                         self.__checkSha1( buf, chunk.sha1, cpath )
                         f.write( buf )
                         progressCB( len(buf) )
+
+                    # Need to flush both at libc and kernel layers here to
+                    # ensure that the os.rename() below works correctly under
+                    # windows
+                    f.flush()
+                    os.fsync(f.fileno())
+
                 if filesha1.hexdigest() != pf.sha1:
                     raise RuntimeError, "sha1 for {0} doesn't match".format(pf.path)
 
