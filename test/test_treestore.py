@@ -199,7 +199,7 @@ class TestTreeStore(unittest.TestCase):
             treestore.rename( 'v1.0', 'v1.0x' )
             pkg = treestore.find( 'v1.0x' )
             treestore.download( pkg, CaptureDownloadProgress() )
-            destTree = os.path.join( self.workdir, 'dest-2' )
+            destTree = os.path.join( self.workdir, 'dest-3' )
             treestore.install( pkg, destTree, CaptureInstallProgress() )
             self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
 
