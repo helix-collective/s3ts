@@ -6,6 +6,10 @@ from s3ts import package
 
 CONFIG_PATH = 'config'
 TREES_PATH = 'trees'
+CHUNKS_PATH = 'chunks'
+RAW_PATH = 'raw'
+ZLIB_PATH = 'zlib'
+
 
 class TreeStore(object):
     """implements a directory tree store
@@ -114,19 +118,11 @@ class TreeStore(object):
 
     def verify( self, pkg ):
         """confirms that all data for the given package is present in the store"""
-        for pf in pkg.files:
-            for chunk in pf.chunks:
-                cpath = self.__chunkPath( self.pkgStore, chunk.sha1, chunk.encoding )
-                if not self.pkgStore.exists( cpath ):
-                    raise RuntimeError, "{0} not found".format(cpath)
+        self.__verifyStore( self.pkgStore, pkg )
 
     def verifyLocal( self, pkg ):
         """confirms that all data for the given package is present in the local cache"""
-        for pf in pkg.files:
-            for chunk in pf.chunks:
-                cpath = self.__chunkPath( self.localCache, chunk.sha1, chunk.encoding )
-                if not self.localCache.exists( cpath ):
-                    raise RuntimeError, "{0} not found".format(cpath)
+        self.__verifyStore( self.localCache, pkg )
 
     def download( self,  pkg, progressCB ):
         """downloads all data not already present to the local cache
@@ -216,6 +212,53 @@ class TreeStore(object):
             # write details of the install
             writeInstallProperties( localPath, InstallProperties( pkg.name, installTime ) )
 
+    def verifyInstall( self, pkg, localPath ):
+        """confirms that the package is correctly installed at localPath"""
+        
+        # 1) check that the list of files installed matches the list in the package
+        installedFiles = []
+        for root, dirs, files in os.walk(localPath):
+            for file in files:
+                installedFiles.append(os.path.relpath( os.path.join(root, file), localPath ))
+        installedFiles = set(installedFiles)
+
+        packageFiles = [f.path for f in pkg.files]
+        packageFiles = set(packageFiles)
+
+        diff1 = installedFiles.difference(packageFiles)
+        diff2 = packageFiles.difference(installedFiles)
+
+        def summarise(ss):
+            s = ",".join( list(ss)[:3] )
+            if len(ss) > 3:
+                s += "..."
+            return s
+
+        for path in diff1:
+            self.outVerbose( "{} is installed, but not in the package".format(path) )
+        for path in diff2:
+            self.outVerbose( "{} is not installed, but is in the package".format(path) )
+        
+        # 2) verify the contents of each file
+        for pf in pkg.files:
+            path = os.path.join(localPath, pf.path)
+            filesha1 = hashlib.sha1()
+            i = 0
+            with open( path, 'rb' ) as f:
+                for chunk in pf.chunks:
+                    buf = f.read( self.config.chunkSize )
+                    chunksha1 = hashlib.sha1()
+                    chunksha1.update(buf)
+                    filesha1.update(buf)
+                    if chunksha1.hexdigest() != chunk.sha1:
+                        raise RuntimeError( "file {} has incorrect SHA for chunk starting at byte {} (expected: {}, found: {}) "
+                                            .format(path, i,chunk.sha1,chunksha1.hexdigest()) )
+                    i += len(buf)
+            if filesha1.hexdigest() != pf.sha1:
+                raise RuntimeError( "file {} has incorrect overall SHA (expected: {}, found: {}) "
+                                    .format(path, i,pf.sha1,filesha1.hexdigest()) )
+                                            
+
     def addUrls( self, pkg, expiresInSecs ):
         """Update the given package so that it can be accessed directly via pre-signed http urls"""
         for pf in pkg.files:
@@ -234,7 +277,7 @@ class TreeStore(object):
         return self.__validateStore( self.store )
 
     def __validateStore( self, fileStore ):
-        """Walk a local cache directory tree and ensure that all chunks are valid sha1 """
+        """Walk a fileStore and ensure that all chunks are valid sha1 """
         fileList = fileStore.list("")
         corruptedFiles = []
         for fileName in fileList:
@@ -251,6 +294,13 @@ class TreeStore(object):
                 corruptedFiles.append({fileName, fileStore.getMetadata(fileName)})
         return corruptedFiles
 
+    def __verifyStore( self, fileStore, pkg ):
+        """Walk a fileStore and ensure that all chunks for the given package are present"""
+        for pf in pkg.files:
+            for chunk in pf.chunks:
+                cpath = self.__chunkPath( fileStore, chunk.sha1, chunk.encoding )
+                if not fileStore.exists( cpath ):
+                    raise RuntimeError, "{0} not found".format(cpath)
 
     def __storeFiles( self, store, localPath, progressCB ):
         if not os.path.isdir( localPath ):
@@ -301,10 +351,10 @@ class TreeStore(object):
 
     def __chunkPath( self, store, sha1, encoding ):
         enc = {
-            package.ENCODING_RAW : 'raw',
-            package.ENCODING_ZLIB : 'zlib',
+            package.ENCODING_RAW : RAW_PATH,
+            package.ENCODING_ZLIB : ZLIB_PATH,
         }[encoding]
-        return store.mkPath(  'chunks', enc, sha1[:2], sha1[2:] )
+        return store.mkPath( CHUNKS_PATH, enc, sha1[:2], sha1[2:] )
 
     def __compress( self, buf ):
         bufz = zlib.compress( buf )

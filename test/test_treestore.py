@@ -173,8 +173,17 @@ class TestTreeStore(unittest.TestCase):
 
             # Check that the installed tree is the same as the source tree
             self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
-
             self.assertEquals( readInstallProperties(destTree).treeName, 'v1.0' )
+
+            # Use the verifyInstall function to confirm the installed package is ok, and
+            # then check that modifying a file fails verification
+            treestore.verifyInstall( pkg, destTree )
+            with open( os.path.join(destTree,"code/file1.py"), "w" ) as f:
+                f.write("x")
+            self.assertRaises( RuntimeError, treestore.verifyInstall,  pkg, destTree )
+            with open( os.path.join(destTree,"code/file1.py"), "w" ) as f:
+                f.write('#!/bin/env python\n def main(): print "hello"\n')
+            treestore.verifyInstall( pkg, destTree )
 
             # Now create a pre-signed version of the package
             pkg = treestore.find( 'v1.0' )

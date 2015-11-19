@@ -142,6 +142,12 @@ def install( treename, localdir, verbose ):
     treeStore.install( pkg, localdir, InstallProgress(pkg) )
     print
 
+def verifyInstall( treename, localdir, verbose ):
+    treeStore = openTreeStore(verbose=verbose)
+    pkg = treeStore.find( treename )
+    treeStore.verifyInstall( pkg, localdir )
+    print "Package {} verified ok at {}".format(treename,localdir)
+
 def presign( treename, expirySecs ):
     treeStore = openTreeStore()
     pkg = treeStore.find( treename )
@@ -209,6 +215,11 @@ p.add_argument('--verbose', dest='verbose', action='store_true')
 p.add_argument('treename', action='store', help='The name of the tree')
 p.add_argument('localdir', action='store', help='The local directory path')
 
+p = subparsers.add_parser('verify-install', help='Confirm a tree has been correctly installed')
+p.add_argument('--verbose', dest='verbose', action='store_true')
+p.add_argument('treename', action='store', help='The name of the tree')
+p.add_argument('localdir', action='store', help='The local directory path')
+
 p = subparsers.add_parser('presign', help='Generate a package definition containing presigned urls ')
 p.add_argument('treename', action='store', help='The name of the tree')
 p.add_argument('--expirySecs', action='store', default=3600, type=int,
@@ -249,6 +260,8 @@ def main():
         download( args.treename, args.dryRun, args.verbose )
     elif args.commandName == 'install':
         install( args.treename, args.localdir, args.verbose )
+    elif args.commandName == 'verify-install':
+        verifyInstall( args.treename, args.localdir, args.verbose )
     elif args.commandName == 'presign':
         presign( args.treename, args.expirySecs )
     elif args.commandName == 'download-http':
