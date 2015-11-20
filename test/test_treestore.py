@@ -82,7 +82,7 @@ class TestTreeStore(unittest.TestCase):
         localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
         treestore = TreeStore.create( fileStore, localCache, TreeStoreConfig( 100, True ) )
 
-        # Upload it as a tree
+        # Upload 2 trees
         creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
         treestore.upload( 'v1.0', creationTime, self.srcTree, CaptureUploadProgress() )
         pkg = treestore.find( 'v1.0' )
@@ -127,8 +127,26 @@ class TestTreeStore(unittest.TestCase):
         treestore.install( pkg, destTree, CaptureInstallProgress() )
         self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
 
-        # Remove the tree
+        # Test the flushStore function has nothing to remove)
+        treestore.upload( 'extra', creationTime, self.srcTree2, CaptureUploadProgress() )
+        removed = treestore.flushStore()
+        self.assertEquals(len(removed), 0)
+
+        # Remove a tree
         treestore.remove( 'v1.0x' )
+
+        # Test the store now has dangling chunks when can be removed
+        removed = treestore.flushStore()
+        self.assertTrue(len(removed) > 0)
+
+        # Initially the local cache should contain chunks for v1.0 and extra. Empty
+        # the local cache by successive flush operations
+        removed = treestore.flushLocalCache(['extra'])
+        self.assertTrue(len(removed) > 0)
+        removed = treestore.flushLocalCache([])
+        self.assertTrue(len(removed) > 0)
+        removed = treestore.flushLocalCache([])
+        self.assertEquals(len(removed), 0)
 
     def test_s3_treestore(self):
         # Create an s3 backed treestore

@@ -39,7 +39,10 @@ class FileStore(object):
     def url( self, path, expiresInSecs ):
         raise RuntimeError, "Not implemented"
 
-    def mkPath( self, *elements):
+    def joinPath( self, *elements):
+        raise RuntimeError, "Not implemented"
+
+    def splitPath( self, path):
         raise RuntimeError, "Not implemented"
 
     def getMetadata( self, path):
@@ -103,9 +106,12 @@ class LocalFileStore(FileStore):
                 rpath = os.path.relpath( path, os.path.join( self.root, pathPrefix ) )
                 results.append( rpath )
         return results
-
-    def mkPath( self, *elements):
+    
+    def joinPath( self, *elements):
         return os.path.join(*elements)
+
+    def splitPath( self, path):
+        return path.split(os.sep)
 
     def getMetadata(self, path):
         """Returns the size and update time for the given path

@@ -28,3 +28,6 @@ s3ts list
 s3ts info src-1.0
 s3ts rename src-1.0 src-1.1
 s3ts remove --yes src-1.1
+s3ts flush --verbose --dry-run
+s3ts flush --verbose
+s3ts flush-cache --verbose test

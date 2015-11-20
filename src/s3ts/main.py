@@ -133,6 +133,16 @@ def download( treename, dryRun, verbose ):
     treeStore.download( pkg, DownloadProgress(pkg) )
     print
 
+def flush( dryRun, verbose ):
+    treeStore = openTreeStore(dryRun=dryRun,verbose=verbose)
+    treeStore.flushStore()
+    print
+
+def flushCache( dryRun, verbose, packageNames ):
+    treeStore = openTreeStore(dryRun=dryRun,verbose=verbose)
+    treeStore.flushLocalCache(packageNames)
+    print
+    
 def install( treename, localdir, verbose ):
     treeStore = openTreeStore(verbose=verbose)
     pkg = treeStore.find( treename )
@@ -209,6 +219,17 @@ p.add_argument('--dry-run', dest='dryRun', action='store_true')
 p.add_argument('--verbose', dest='verbose', action='store_true')
 p.add_argument('treename', action='store', help='The name of the tree')
 
+p = subparsers.add_parser('flush', help='Flush chunks from the store that are no longer referenced')
+p.set_defaults(dryRun=False,verbose=False)
+p.add_argument('--dry-run', dest='dryRun', action='store_true')
+p.add_argument('--verbose', dest='verbose', action='store_true')
+
+p = subparsers.add_parser('flush-cache', help='Flush chunks from the local cache that are not referenced by the specified packages')
+p.set_defaults(dryRun=False,verbose=False)
+p.add_argument('--dry-run', dest='dryRun', action='store_true')
+p.add_argument('--verbose', dest='verbose', action='store_true')
+p.add_argument('packagenames', nargs='+' )
+
 p = subparsers.add_parser('install', help='Download/Install a tree into the filesystem')
 p.set_defaults(verbose=False)
 p.add_argument('--verbose', dest='verbose', action='store_true')
@@ -258,6 +279,10 @@ def main():
         upload( args.treename, args.localdir, args.dryRun, args.verbose )
     elif args.commandName == 'download':
         download( args.treename, args.dryRun, args.verbose )
+    elif args.commandName == 'flush':
+        flush( args.dryRun, args.verbose )
+    elif args.commandName == 'flush-cache':
+        flushCache( args.dryRun, args.verbose, args.packagenames )
     elif args.commandName == 'install':
         install( args.treename, args.localdir, args.verbose )
     elif args.commandName == 'verify-install':

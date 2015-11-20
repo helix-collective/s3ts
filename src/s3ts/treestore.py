@@ -276,6 +276,23 @@ class TreeStore(object):
     def validateStore(self):
         return self.__validateStore( self.store )
 
+    def flushLocalCache(self, packageNames ):
+        """
+        Remove all chunks from the local cache that are not
+        referenced by the named packages. Returns the chunks removed.
+        """
+        packages = [ self.find(pname) for pname in packageNames]
+        return self.__flushStore( self.localCache, packages )
+
+    def flushStore(self):
+        """
+        Remote any "dangling" chunks from the store that are not referenced by packages.
+        This will happen when packages are deleted Returns the chunks removed.
+        """
+        packageNames = self.pkgStore.list(TREES_PATH)
+        packages = [ self.find(packageName) for packageName in packageNames ]
+        return self.__flushStore( self.pkgStore, packages )
+
     def __validateStore( self, fileStore ):
         """Walk a fileStore and ensure that all chunks are valid sha1 """
         fileList = fileStore.list("")
@@ -302,6 +319,34 @@ class TreeStore(object):
                 if not fileStore.exists( cpath ):
                     raise RuntimeError, "{0} not found".format(cpath)
 
+    def __flushStore( self, fileStore, packages ):
+        """Remove all keys from the store except those referenced by the given packages"""
+
+        # Generate the keys for all chunks in those packages
+        keysToKeep = set()
+        for pkg in packages:
+            for pf in pkg.files:
+                for chunk in pf.chunks:
+                    keysToKeep.add( (chunk.encoding,chunk.sha1) )
+
+        # Generate the set of all keys currently in the store
+        allKeys = set()
+        for path in fileStore.list( CHUNKS_PATH ):
+            encoding,s1,s2 = fileStore.splitPath(path)
+            allKeys.add( (encoding,s1+s2))
+
+        # Work out the keys to remove
+        keysToRemove = allKeys.difference( keysToKeep )
+
+        self.outVerbose( "{} packages reference {} chunks...".format(len(packages),len(keysToKeep)))
+        self.outVerbose( "The store contains {} chunks, removing {}".format(len(allKeys),len(keysToRemove)))
+
+        # remove them
+        if not self.dryRun:
+            for encoding,sha1 in keysToRemove:
+                fileStore.remove( self.__chunkPath(fileStore, sha1, encoding) )
+        return keysToRemove
+            
     def __storeFiles( self, store, localPath, progressCB ):
         if not os.path.isdir( localPath ):
             raise IOError( "directory {0} doesn't exist".format( localPath ) )
@@ -347,14 +392,14 @@ class TreeStore(object):
         return package.FileChunk( sha1, size, encoding, None )
 
     def __treeNamePath( self, store, treeName ):
-        return store.mkPath( TREES_PATH, treeName )
+        return store.joinPath( TREES_PATH, treeName )
 
     def __chunkPath( self, store, sha1, encoding ):
         enc = {
             package.ENCODING_RAW : RAW_PATH,
             package.ENCODING_ZLIB : ZLIB_PATH,
         }[encoding]
-        return store.mkPath( CHUNKS_PATH, enc, sha1[:2], sha1[2:] )
+        return store.joinPath( CHUNKS_PATH, enc, sha1[:2], sha1[2:] )
 
     def __compress( self, buf ):
         bufz = zlib.compress( buf )
