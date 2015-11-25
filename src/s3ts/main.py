@@ -155,8 +155,15 @@ def install( treename, localdir, verbose ):
 def verifyInstall( treename, localdir, verbose ):
     treeStore = openTreeStore(verbose=verbose)
     pkg = treeStore.find( treename )
-    treeStore.verifyInstall( pkg, localdir )
-    print "Package {} verified ok at {}".format(treename,localdir)
+    result = treeStore.compareInstall( pkg, localdir )
+    for path in result.missing:
+        print "{} is missing".format(path)
+    for path in result.diffs:
+        print "{} is different".format(path)
+    if len(result.missing) == 0 and len(result.diffs) == 0:
+        print "Package {} verified ok at {}".format(treename,localdir)
+    else:
+        sys.exit(1)
 
 def presign( treename, expirySecs ):
     treeStore = openTreeStore()

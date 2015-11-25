@@ -193,19 +193,38 @@ class TestTreeStore(unittest.TestCase):
             self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
             self.assertEquals( readInstallProperties(destTree).treeName, 'v1.0' )
 
-            # Use the verifyInstall function to confirm the installed package is ok, and
-            # then check that modifying a file fails verification
-            treestore.verifyInstall( pkg, destTree )
+            # Use the compareInstall function to confirm the installed package is ok, and
+            # then check that modifying the files show up in the comparison
+            result = treestore.compareInstall( pkg, destTree )
+            self.assertEquals( len(result.missing), 0 )
+            self.assertEquals( len(result.extra), 0 )
+            self.assertEquals( len(result.diffs), 0 )
+
             with open( os.path.join(destTree,"code/file1.py"), "w" ) as f:
                 f.write("x")
-            self.assertRaises( RuntimeError, treestore.verifyInstall,  pkg, destTree )
-            with open( os.path.join(destTree,"code/file1.py"), "w" ) as f:
-                f.write('#!/bin/env python\n def main(): print "hello"\n')
-            treestore.verifyInstall( pkg, destTree )
+            with open( os.path.join(destTree,"code/file3.py"), "w" ) as f:
+                f.write("y")
+            os.unlink(os.path.join(destTree,'assets/car-01.db'))
+            
+            result = treestore.compareInstall( pkg, destTree )
+            self.assertEquals( result.missing, set(['assets/car-01.db']) )
+            self.assertEquals( result.extra, set(['code/file3.py']) )
+            self.assertEquals( result.diffs, set(['code/file1.py']) )
+
+            # Reinstall to fix directory content
+            shutil.rmtree( destTree )
+            treestore.install( pkg, destTree, CaptureInstallProgress() )
+            result = treestore.compareInstall( pkg, destTree )
+            self.assertEquals( len(result.missing), 0 )
+            self.assertEquals( len(result.extra), 0 )
+            self.assertEquals( len(result.diffs), 0 )
 
             # Now create a pre-signed version of the package
             pkg = treestore.find( 'v1.0' )
             treestore.addUrls( pkg, 3600 )
+            self.assertEquals( len(result.missing), 0 )
+            self.assertEquals( len(result.extra), 0 )
+            self.assertEquals( len(result.diffs), 0 )
 
             # And download it directly via http. Create a new local cache
             # to ensure that we actually redownload each chunk

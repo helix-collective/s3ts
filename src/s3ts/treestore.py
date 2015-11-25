@@ -1,7 +1,7 @@
 import os, hashlib, zlib, tempfile, datetime, time
 import requests
 
-from s3ts.config import TreeStoreConfig, TreeStoreConfigJS, InstallProperties, writeInstallProperties
+from s3ts.config import TreeStoreConfig, TreeStoreConfigJS, InstallProperties, writeInstallProperties, S3TS_PROPERTIES
 from s3ts import package
 
 CONFIG_PATH = 'config'
@@ -212,8 +212,15 @@ class TreeStore(object):
             # write details of the install
             writeInstallProperties( localPath, InstallProperties( pkg.name, installTime ) )
 
-    def verifyInstall( self, pkg, localPath ):
-        """confirms that the package is correctly installed at localPath"""
+    def compareInstall( self, pkg, localPath ):
+        """
+        Compares the package against the files installed in the given directory.
+        Returns an object with 3 fields:
+
+               result.missing - paths of files present in the package but missing on disk
+               result.extra   - paths of files present on disk, but missing in the package
+               result.diffs   - paths with different content
+        """
         
         # 1) check that the list of files installed matches the list in the package
         installedFiles = []
@@ -221,43 +228,37 @@ class TreeStore(object):
             for file in files:
                 installedFiles.append(os.path.relpath( os.path.join(root, file), localPath ))
         installedFiles = set(installedFiles)
+        installedFiles.remove( S3TS_PROPERTIES )
 
         packageFiles = [f.path for f in pkg.files]
         packageFiles = set(packageFiles)
 
-        diff1 = installedFiles.difference(packageFiles)
-        diff2 = packageFiles.difference(installedFiles)
+        class Result: pass
 
-        def summarise(ss):
-            s = ",".join( list(ss)[:3] )
-            if len(ss) > 3:
-                s += "..."
-            return s
+        result = Result()
+        result.missing = packageFiles.difference(installedFiles)
+        result.extra = installedFiles.difference(packageFiles)
+        result.diffs = set()
 
-        for path in diff1:
-            self.outVerbose( "{} is installed, but not in the package".format(path) )
-        for path in diff2:
-            self.outVerbose( "{} is not installed, but is in the package".format(path) )
-        
         # 2) verify the contents of each file
         for pf in pkg.files:
-            path = os.path.join(localPath, pf.path)
-            filesha1 = hashlib.sha1()
-            i = 0
-            with open( path, 'rb' ) as f:
-                for chunk in pf.chunks:
-                    buf = f.read( self.config.chunkSize )
-                    chunksha1 = hashlib.sha1()
-                    chunksha1.update(buf)
-                    filesha1.update(buf)
-                    if chunksha1.hexdigest() != chunk.sha1:
-                        raise RuntimeError( "file {} has incorrect SHA for chunk starting at byte {} (expected: {}, found: {}) "
-                                            .format(path, i,chunk.sha1,chunksha1.hexdigest()) )
-                    i += len(buf)
-            if filesha1.hexdigest() != pf.sha1:
-                raise RuntimeError( "file {} has incorrect overall SHA (expected: {}, found: {}) "
-                                    .format(path, i,pf.sha1,filesha1.hexdigest()) )
-                                            
+            if pf.path in installedFiles:
+                path = os.path.join(localPath, pf.path)
+                filesha1 = hashlib.sha1()
+                i = 0
+                with open( path, 'rb' ) as f:
+                    for chunk in pf.chunks:
+                        buf = f.read( self.config.chunkSize )
+                        chunksha1 = hashlib.sha1()
+                        chunksha1.update(buf)
+                        filesha1.update(buf)
+                        if chunksha1.hexdigest() != chunk.sha1:
+                            result.diffs.add( pf.path )
+                        i += len(buf)
+                if filesha1.hexdigest() != pf.sha1:
+                    result.diffs.add( pf.path )
+
+        return result
 
     def addUrls( self, pkg, expiresInSecs ):
         """Update the given package so that it can be accessed directly via pre-signed http urls"""
