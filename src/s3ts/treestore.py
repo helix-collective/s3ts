@@ -283,6 +283,8 @@ class TreeStore(object):
         referenced by the named packages. Returns the chunks removed.
         """
         packages = [ self.find(pname) for pname in packageNames]
+        if len(packages) == 0:
+            raise RuntimeError, "flushLocalCache refuses to remove all cached chunks"
         return self.__flushStore( self.localCache, packages )
 
     def flushStore(self):

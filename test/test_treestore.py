@@ -139,14 +139,18 @@ class TestTreeStore(unittest.TestCase):
         removed = treestore.flushStore()
         self.assertTrue(len(removed) > 0)
 
+        treestore.upload( 'v1.0', creationTime, self.srcTree, CaptureUploadProgress() )
+
         # Initially the local cache should contain chunks for v1.0 and extra. Empty
         # the local cache by successive flush operations
         removed = treestore.flushLocalCache(['extra'])
         self.assertTrue(len(removed) > 0)
-        removed = treestore.flushLocalCache([])
+        removed = treestore.flushLocalCache(['v1.0'])
         self.assertTrue(len(removed) > 0)
-        removed = treestore.flushLocalCache([])
-        self.assertEquals(len(removed), 0)
+
+        # Confirm that removing everything from the local cache is refused
+        with self.assertRaises(RuntimeError):
+            treestore.flushLocalCache([])
 
     def test_s3_treestore(self):
         # Create an s3 backed treestore
