@@ -63,6 +63,7 @@ class TestTreeStore(unittest.TestCase):
         fs = LocalFileStore( self.srcTree2 )
         fs.put( 'code/file1.py', '#!/bin/env python\n def main(): print "hello!"\n' )
         fs.put( 'code/file3.py', '#!/bin/env python\n def main(): print "goodbye foreever"\n' )
+        fs.put( 'code/file4.py', '#!/bin/env python\n def main(): print "what now"\n' )
         fs.put( 'assets/car-01.db',
                 'Some big and complicated data structure goes here, hopefully big enough that it requires chunking and compression.\n'
                 'sydney london paris port moresby okinawa st petersburg salt lake city  new york whitehorse mawson woy woy st louis\n'
@@ -255,6 +256,33 @@ class TestTreeStore(unittest.TestCase):
 
             # Remove the tree
             treestore.remove( 'v1.0x' )
+            
+    def test_s3_prefixes(self):
+        # Requires these environment variables set
+        #
+        #   AWS_ACCESS_KEY_ID
+        #   AWS_SECRET_ACCESS_KEY
+        #   S3TS_BUCKET
+        #
+        # NB: **this will only work if the bucket is empty
+
+        s3c = boto.connect_s3()
+        bucket = s3c.get_bucket( os.environ['S3TS_BUCKET'] )
+
+        with EmptyS3Bucket(bucket):
+            localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
+            treestore1 = TreeStore.create( S3FileStore( bucket, "prefix1" ), localCache, TreeStoreConfig( 100, True ) )
+            treestore2 = TreeStore.create( S3FileStore( bucket, "prefix2" ), localCache, TreeStoreConfig( 100, True ) )
+
+            # Confirm we can write the different values to the same path in both treestores,
+            # and the different prefix keeps them separate independent
+            creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
+            treestore1.upload( 'release', creationTime, self.srcTree, CaptureUploadProgress() )
+            treestore2.upload( 'release', creationTime, self.srcTree2, CaptureUploadProgress() )
+            pkg1 = treestore1.find( 'release' )
+            pkg2 = treestore2.find( 'release' )
+            self.assertEquals(len(pkg1.files),3)
+            self.assertEquals(len(pkg2.files),4)
 
     def test_s3_many_treestore(self):
         # Create an s3 backed treestore

@@ -55,19 +55,20 @@ def connectToBucket():
     awsAccessKeyId = getEnv( 'AWS_ACCESS_KEY_ID', 'the AWS access key id' )
     awsSecretAccessKey = getEnv( 'AWS_SECRET_ACCESS_KEY', 'the AWS secret access key' )
     bucketName = getEnv( 'S3TS_BUCKET', 'the AWS S3 bucket used for tree storage'  )
+    s3PathPrefix = os.environ.get( 'S3TS_S3PREFIX' )
     s3c = boto.connect_s3(awsAccessKeyId,awsSecretAccessKey)
-    return s3c.get_bucket( bucketName )
+    return s3c.get_bucket( bucketName ),s3PathPrefix
 
 def createTreeStore(chunksize):
     localCacheDir = getEnv( 'S3TS_LOCALCACHE', 'the local directory used for caching'  )
-    bucket = connectToBucket()
+    bucket,s3PathPrefix = connectToBucket()
     config = TreeStoreConfig( chunksize, True )
-    return TreeStore.create( S3FileStore(bucket), LocalFileStore(localCacheDir), config )
+    return TreeStore.create( S3FileStore(bucket,s3PathPrefix), LocalFileStore(localCacheDir), config )
 
 def openTreeStore(dryRun=False,verbose=False):
     localCacheDir = getEnv( 'S3TS_LOCALCACHE', 'the local directory used for caching'  )
-    bucket = connectToBucket()
-    treeStore = TreeStore.open( S3FileStore(bucket), LocalFileStore(localCacheDir) )
+    bucket,s3PathPrefix = connectToBucket()
+    treeStore = TreeStore.open( S3FileStore(bucket,s3PathPrefix), LocalFileStore(localCacheDir) )
     treeStore.setDryRun(dryRun)
     if verbose:
         treeStore.setOutVerbose( outVerbose )
