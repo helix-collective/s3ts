@@ -45,3 +45,9 @@ It can be run directly from the command line:
 ```
 python dist/s3ts.zip --help
 ```
+
+# Documentation
+
+See the [wiki][] for more information.
+
+[wiki]:https://github.com/helix-collective/s3ts/wiki
