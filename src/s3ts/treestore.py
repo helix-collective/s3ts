@@ -45,7 +45,6 @@ class TreeStore(object):
         self.config = config
         self.dryRun = False
         self.outVerbose = lambda *args : None
-
     def setDryRun( self, dryRun ):
         """Set the dryRun flag.
 
@@ -372,27 +371,29 @@ class TreeStore(object):
                 chunksha1 = hashlib.sha1()
                 chunksha1.update( buf )
                 filesha1.update( buf )
-                size = len(buf)
-                encoding = package.ENCODING_RAW
-                if self.config.useCompression:
-                    buf,encoding = self.__compress( buf )
-                chunks.append( self.__storeChunk( store, chunksha1.hexdigest(), encoding, buf, size, progressCB ) )
+                chunks.append( self.__storeChunk( store, chunksha1.hexdigest(), buf, progressCB ) )
         self.outVerbose( "file {} has hash {}", rpath, filesha1.hexdigest() )
         #make the package path consistent and have only forward slash
         rpath = rpath.replace("\\", "/")
         return package.PackageFile( filesha1.hexdigest(), rpath, chunks )
 
-    def __storeChunk( self, store, sha1, encoding, buf, size, progressCB ):
-        cpath = self.__chunkPath( store, sha1, encoding )
-
-        if store.exists( cpath ):
+    def __storeChunk( self, store, sha1, buf, progressCB ):
+        size = len(buf)
+        if store.exists( self.__chunkPath( store, sha1, package.ENCODING_RAW ) ):
             progressCB( 0, size )
+            return package.FileChunk( sha1, size, package.ENCODING_RAW, None )
+        elif store.exists( self.__chunkPath( store, sha1, package.ENCODING_ZLIB ) ):
+            progressCB( 0, size )
+            return package.FileChunk( sha1, size, package.ENCODING_ZLIB, None )
         else:
+            encoding = package.ENCODING_RAW
+            if self.config.useCompression:
+                buf,encoding = self.__compress( buf )
             if not self.dryRun:
                 self.outVerbose( "Uploading {} chunk with hash {}", encoding, sha1  )
-                store.put( cpath, buf )
+                store.put( self.__chunkPath( store, sha1, encoding ), buf )
             progressCB( size, 0 )
-        return package.FileChunk( sha1, size, encoding, None )
+            return package.FileChunk( sha1, size, encoding, None )
 
     def __treeNamePath( self, store, treeName ):
         return store.joinPath( TREES_PATH, treeName )
