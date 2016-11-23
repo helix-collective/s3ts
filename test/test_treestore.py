@@ -1,10 +1,11 @@
-import os, tempfile, unittest, shutil, subprocess, datetime
+import os, tempfile, unittest, shutil, subprocess, datetime, time
 
 from s3ts.filestore import LocalFileStore
 from s3ts.s3filestore import S3FileStore
 from s3ts.config import TreeStoreConfig, readInstallProperties, S3TS_PROPERTIES
 from s3ts.treestore import TreeStore
 from s3ts.utils import datetimeFromIso
+from s3ts.package import PackageJS, S3TS_PACKAGEFILE
 
 import boto
 import logging
@@ -49,25 +50,36 @@ class TestTreeStore(unittest.TestCase):
             shutil.rmtree( self.workdir )
         os.makedirs( self.workdir )
 
+        self.FILE1 = '#!/bin/env python\n def main(): print "hello"\n'
+        self.FILE2 = '#!/bin/env python\n def main(): print "goodbye"\n'
+        self.FILE2_A = '#!/bin/env python\n def main(): print "goodbye foreever"\n'
+        self.FILE3 = '#!/bin/env python\n def main(): print "goodbye foreever"\n'
+        self.FILE4 = '#!/bin/env python\n def main(): print "what now"\n' 
+        self.CAR01 = (
+            'Some big and complicated data structure goes here, hopefully big enough that it requires chunking and compression.\n'
+            'sydney london paris port moresby okinawa st petersburg salt lake city  new york whitehorse mawson woy woy st louis\n'
+            )
+        
+
         # Create some test input data
         self.srcTree = makeEmptyDir( os.path.join( self.workdir, 'src-1' ) )
         fs = LocalFileStore( self.srcTree )
-        fs.put( 'code/file1.py', '#!/bin/env python\n def main(): print "hello"\n' )
-        fs.put( 'code/file2.py', '#!/bin/env python\n def main(): print "goodbye"\n' )
-        fs.put( 'assets/car-01.db',
-                'Some big and complicated data structure goes here, hopefully big enough that it requires chunking and compression.\n'
-                'sydney london paris port moresby okinawa st petersburg salt lake city  new york whitehorse mawson woy woy st louis\n'
-        )
+        fs.put( 'code/file1.py', self.FILE1)
+        fs.put( 'code/file2.py', self.FILE2)
+        fs.put( 'assets/car-01.db', self.CAR01)
 
         self.srcTree2 = makeEmptyDir( os.path.join( self.workdir, 'src-2' ) )
         fs = LocalFileStore( self.srcTree2 )
-        fs.put( 'code/file1.py', '#!/bin/env python\n def main(): print "hello!"\n' )
-        fs.put( 'code/file3.py', '#!/bin/env python\n def main(): print "goodbye foreever"\n' )
-        fs.put( 'code/file4.py', '#!/bin/env python\n def main(): print "what now"\n' )
-        fs.put( 'assets/car-01.db',
-                'Some big and complicated data structure goes here, hopefully big enough that it requires chunking and compression.\n'
-                'sydney london paris port moresby okinawa st petersburg salt lake city  new york whitehorse mawson woy woy st louis\n'
-        )
+        fs.put( 'code/file1.py', self.FILE1 )
+        fs.put( 'code/file3.py', self.FILE3 )
+        fs.put( 'code/file4.py', self.FILE4)
+        fs.put( 'assets/car-01.db', self.CAR01 )
+
+        self.srcTree3 = makeEmptyDir( os.path.join( self.workdir, 'src-3' ) )
+        fs = LocalFileStore( self.srcTree3 )
+        fs.put( 'code/file1.py', self.FILE1 )
+        fs.put( 'code/file2.py', self.FILE2_A )
+        fs.put( 'code/file4.py', self.FILE4 )
 
         self.srcVariant = makeEmptyDir( os.path.join( self.workdir, 'src1-kiosk' ) )
         fs = LocalFileStore( self.srcVariant )
@@ -152,6 +164,76 @@ class TestTreeStore(unittest.TestCase):
         # Confirm that removing everything from the local cache is refused
         with self.assertRaises(RuntimeError):
             treestore.flushLocalCache([])
+
+    def test_sync(self):            
+        # Create a file system backed treestore
+        fileStore = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'fs' ) ) )
+        localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
+        treestore = TreeStore.create( fileStore, localCache, TreeStoreConfig( 10, True ) )
+
+        creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
+        treestore.upload( 'v1.0', creationTime, self.srcTree, CaptureUploadProgress() )
+        treestore.upload( 'v1.3', creationTime, self.srcTree3, CaptureUploadProgress() )
+
+        testdir = makeEmptyDir( os.path.join( self.workdir, 'test' ) )
+
+        def assertExists( path ):
+            self.assertTrue( os.path.exists( os.path.join(testdir, path) ) )
+
+        def assertContains( path, text ):
+            self.assertEquals( open( os.path.join(testdir, path) ).read(), text )
+
+        def assertDoesntExist( path ):
+            self.assertFalse( os.path.exists( os.path.join(testdir, path) ) ) 
+        
+        # sync a package to an empty directory
+        pkg = treestore.find('v1.0')
+        treestore.download( pkg, CaptureDownloadProgress() ) 
+        treestore.sync( pkg, testdir, CaptureInstallProgress() )
+        assertContains( "code/file1.py", self.FILE1 )
+        assertContains( "code/file2.py", self.FILE2 )
+        assertContains( "assets/car-01.db", self.CAR01 )
+        assertExists( S3TS_PACKAGEFILE )
+
+        # Re-sync the same package
+        pkg = treestore.find('v1.0')
+        treestore.download( pkg, CaptureDownloadProgress() ) 
+        treestore.sync( pkg, testdir, CaptureInstallProgress() )
+        assertContains( "code/file1.py", self.FILE1 )
+        assertContains( "code/file2.py", self.FILE2 )
+        assertContains( "assets/car-01.db", self.CAR01 )
+        assertExists( S3TS_PACKAGEFILE )
+
+        # Sync to a different package
+        pkg = treestore.find('v1.3')
+        treestore.download( pkg, CaptureDownloadProgress() ) 
+        treestore.sync( pkg, testdir, CaptureInstallProgress() )
+        assertContains( "code/file1.py", self.FILE1 )
+        assertContains( "code/file2.py", self.FILE2_A )
+        assertDoesntExist( "assets/car-01.db" )
+        assertContains( "code/file4.py", self.FILE4 )
+        assertExists( S3TS_PACKAGEFILE )
+
+        # Sync back to the first package
+        pkg = treestore.find('v1.0')
+        treestore.download( pkg, CaptureDownloadProgress() ) 
+        treestore.sync( pkg, testdir, CaptureInstallProgress() )
+        assertContains( "code/file1.py", self.FILE1 )
+        assertContains( "code/file2.py", self.FILE2 )
+        assertContains( "assets/car-01.db", self.CAR01 )
+        assertDoesntExist( "code/file4.py" )
+        assertExists( S3TS_PACKAGEFILE )
+
+        # Remove the package file, and sync the second package again
+        os.unlink( os.path.join( testdir, S3TS_PACKAGEFILE ) )
+        pkg = treestore.find('v1.3')
+        treestore.download( pkg, CaptureDownloadProgress() ) 
+        treestore.sync( pkg, testdir, CaptureInstallProgress() )
+        assertContains( "code/file1.py", self.FILE1 )
+        assertContains( "code/file2.py", self.FILE2_A )
+        assertDoesntExist( "assets/car-01.db" )
+        assertContains( "code/file4.py", self.FILE4 )
+        assertExists( S3TS_PACKAGEFILE )
 
     def test_s3_treestore(self):
         # Create an s3 backed treestore

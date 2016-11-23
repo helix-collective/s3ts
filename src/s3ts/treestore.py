@@ -1,4 +1,4 @@
-import os, hashlib, zlib, tempfile, datetime, time
+import os, hashlib, zlib, tempfile, datetime, time, shutil
 import requests
 
 from s3ts.config import TreeStoreConfig, TreeStoreConfigJS, InstallProperties, writeInstallProperties, S3TS_PROPERTIES
@@ -165,13 +165,48 @@ class TreeStore(object):
                     self.localCache.put( lpath, buf )
                     progressCB( chunk.size, 0 )
 
+
+    def sync( self, pkg, localPath, progressCB ):
+        """synchronise the content of localpath with the given package,
+        reusing existing files where possible.
+
+        progressCB will be called with parameters (nBytes) as the installation progresses,
+        """
+        try:
+            existingPkg = package.readInstallPackage(localPath)
+        except IOError:
+            existingPkg = None
+
+        if not existingPkg:
+            # Start from scratch
+            syncPkg,pathsToRemove = pkg,[]
+            if os.path.exists( localPath ):
+                shutil.rmtree( localPath )
+            os.makedirs( localPath )
+        else:
+            # Synchronise the existing content.
+            syncPkg,pathsToRemove = package.packageDiff( existingPkg, pkg )
+
+            # Remove the existing package from disk, so that if anything
+            # fails during the sync, we start from scratch next time
+            os.unlink( os.path.join( localPath, package.S3TS_PACKAGEFILE ) )
+
+        installTime = datetime.datetime.now()
+        self.__install( syncPkg, localPath, progressCB )
+        for path in pathsToRemove: os.unlink( os.path.join( localPath, path ) )
+        package.writeInstallPackage( localPath, pkg )
+        writeInstallProperties( localPath, InstallProperties( pkg.name, installTime ) )
+            
     def install( self, pkg, localPath, progressCB ):
         """installs the given package into the local path
 
         progressCB will be called with parameters (nBytes) as the installation progresses,
-
         """
         installTime = datetime.datetime.now()
+        self.__install( pkg, localPath, progressCB )
+        writeInstallProperties( localPath, InstallProperties( pkg.name, installTime ) )
+
+    def __install( self, pkg, localPath, progressCB ):
 
         for pf in pkg.files:
             targetPath = os.path.join( localPath, pf.path )
@@ -207,9 +242,6 @@ class TreeStore(object):
             except:
                 if f: os.unlink( f.name )
                 raise
-
-            # write details of the install
-            writeInstallProperties( localPath, InstallProperties( pkg.name, installTime ) )
 
     def compareInstall( self, pkg, localPath ):
         """

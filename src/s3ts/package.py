@@ -1,4 +1,4 @@
-import json, datetime
+import json, datetime, os
 
 from s3ts.utils import datetimeFromIso
 
@@ -84,3 +84,50 @@ class FileChunkJS(object):
 
     def fromJson( self, jv ):
         return FileChunk( jv['sha1'], jv['size'], jv['encoding'], jv.get('url') )
+
+
+def packageDiff(package1, package2):
+    """
+    Compute a package that reflects the changes required to turn package1
+    into package2. The set of file path that must be deleted is also returned.
+    """
+
+    def filesByPath(package):
+        dict = {}
+        for f in package.files:
+            dict[f.path] = f
+        return dict
+
+    files1 = filesByPath(package1)
+    files2 = filesByPath(package2)
+    paths1 = set(files1.keys())
+    paths2 = set(files2.keys())
+
+    removedPaths = paths1.difference(paths2)
+    commonPaths = paths1.intersection(paths2)
+    addedPaths = paths2.difference(paths1)
+    
+    diffPackage = Package(
+        name="%s->%s" % (package1.name,package2.name),
+        creationTime=package2.creationTime,
+        files=[]
+        )
+
+    for p in addedPaths:
+        diffPackage.files.append(files2[p])
+
+    for p in commonPaths:
+        if files1[p].sha1 != files2[p].sha1:
+            diffPackage.files.append(files2[p])
+
+    return diffPackage,removedPaths
+            
+S3TS_PACKAGEFILE = '.s3ts.package' 
+
+def writeInstallPackage( installDir, pkg ):
+    with open( os.path.join( installDir, S3TS_PACKAGEFILE ), 'w' ) as f:
+        f.write( json.dumps( PackageJS().toJson( pkg ) ) )
+
+def readInstallPackage( installDir ):
+    with open( os.path.join( installDir, S3TS_PACKAGEFILE ), 'r' ) as f:
+        return PackageJS().fromJson( json.loads( f.read() ) )
