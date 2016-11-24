@@ -193,7 +193,10 @@ class TreeStore(object):
 
         installTime = datetime.datetime.now()
         self.__install( syncPkg, localPath, progressCB )
-        for path in pathsToRemove: os.unlink( os.path.join( localPath, path ) )
+        for path in pathsToRemove:
+            path = os.path.join( localPath, path )
+            self.outVerbose( "removing {}", path )
+            os.unlink( path )
         package.writeInstallPackage( localPath, pkg )
         writeInstallProperties( localPath, InstallProperties( pkg.name, installTime ) )
             
