@@ -5,7 +5,7 @@ import boto
 from s3ts.treestore import TreeStore, TreeStoreConfig
 from s3ts.filestore import FileStore, LocalFileStore
 from s3ts.s3filestore import S3FileStore
-from s3ts.package import PackageJS
+from s3ts.package import PackageJS, packageDiff
 
 def getEnv( name, desc ):
     try:
@@ -193,6 +193,35 @@ def validateCache():
     treeStore = openTreeStore()
     print treeStore.validateLocalCache()
 
+def comparePackages( packageName1, packageName2 ):
+    treeStore = openTreeStore()
+    print "Fetching {}...".format(packageName1)
+    package1 = treeStore.find(packageName1)
+    print "Fetching {}...".format(packageName2)
+    package2 = treeStore.find(packageName2)
+    print "---"
+
+    size1 = 0
+    size2 = 0
+    diffSize = 0
+
+    for f in package1.files:
+        size1 += f.size()
+    for f in package2.files:
+        size2 += f.size()
+    diffPackage,removedPaths = packageDiff(package1,package2)
+    for p in removedPaths:
+        print "Removed", p
+    for f in diffPackage.files:
+        size = f.size()
+        print "Updated {} (size {:,})".format(f.path,size)
+        diffSize += size
+
+    print
+    print "{} size = {:,}".format(package1.name,size1)
+    print "{} size = {:,}".format(package2.name,size2)
+    print "update size = {:,}".format(diffSize)
+
 parser = argparse.ArgumentParser()
 
 subparsers = parser.add_subparsers(help='commands',dest='commandName')
@@ -269,6 +298,10 @@ p.add_argument('treename', action='store', help='The name of the tree')
 p.add_argument('localdir', action='store', help='The local directory path')
 p.add_argument('local_variant_dir', action='store', help='The local variant path')
 
+p = subparsers.add_parser('compare-packages', help='Compare two packages')
+p.add_argument('package1', action='store', help='The first package')
+p.add_argument('package2', action='store', help='The second package')
+
 validate_local_cache_parser = subparsers.add_parser('validate-local-cache', help='Validates the local cache')
 
 def main():
@@ -307,6 +340,8 @@ def main():
         uploadMany(args.treename, args.localdir, args.local_variant_dir)
     elif args.commandName == 'validate-local-cache':
         validateCache()
+    elif args.commandName == 'compare-packages':
+        comparePackages(args.package1, args.package2)
 
 if __name__ == '__main__':
     main()
