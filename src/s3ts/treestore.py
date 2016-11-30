@@ -2,7 +2,7 @@ import os, hashlib, zlib, tempfile, datetime, time, shutil
 import requests
 
 from s3ts.config import TreeStoreConfig, TreeStoreConfigJS, InstallProperties, writeInstallProperties, S3TS_PROPERTIES
-from s3ts import package, filewriter
+from s3ts import package, filewriter, utils
 
 CONFIG_PATH = 'config'
 TREES_PATH = 'trees'
@@ -192,11 +192,15 @@ class TreeStore(object):
             os.unlink( os.path.join( localPath, package.S3TS_PACKAGEFILE ) )
 
         installTime = datetime.datetime.now()
-        self.__install( syncPkg, localPath, progressCB )
+        # Remove existing files first, and any empty directories
+        # to ensure that if we replace a directory with a file,
+        # it's gone by the time we install it
         for path in pathsToRemove:
             path = os.path.join( localPath, path )
             self.outVerbose( "removing {}", path )
             os.unlink( path )
+        utils.removeEmptyDirectories(localPath, removeRoot=False)
+        self.__install( syncPkg, localPath, progressCB )
         package.writeInstallPackage( localPath, pkg )
         writeInstallProperties( localPath, InstallProperties( pkg.name, installTime ) )
             

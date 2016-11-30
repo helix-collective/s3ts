@@ -55,6 +55,7 @@ class TestTreeStore(unittest.TestCase):
         self.FILE2_A = '#!/bin/env python\n def main(): print "goodbye foreever"\n'
         self.FILE3 = '#!/bin/env python\n def main(): print "goodbye foreever"\n'
         self.FILE4 = '#!/bin/env python\n def main(): print "what now"\n' 
+        self.FILE5 = 'Just text' 
         self.CAR01 = (
             'Some big and complicated data structure goes here, hopefully big enough that it requires chunking and compression.\n'
             'sydney london paris port moresby okinawa st petersburg salt lake city  new york whitehorse mawson woy woy st louis\n'
@@ -80,6 +81,14 @@ class TestTreeStore(unittest.TestCase):
         fs.put( 'code/file1.py', self.FILE1 )
         fs.put( 'code/file2.py', self.FILE2_A )
         fs.put( 'code/file4.py', self.FILE4 )
+        fs.put( 'text/text', self.FILE5 )
+
+        self.srcTree4 = makeEmptyDir( os.path.join( self.workdir, 'src-4' ) )
+        fs = LocalFileStore( self.srcTree4 )
+        fs.put( 'file1.py', self.FILE1 )
+        fs.put( 'code/file2.py', self.FILE2_A )
+        fs.put( 'code/file4.py', self.FILE4 )
+        fs.put( 'text', self.FILE5 )
 
         self.srcVariant = makeEmptyDir( os.path.join( self.workdir, 'src1-kiosk' ) )
         fs = LocalFileStore( self.srcVariant )
@@ -174,6 +183,7 @@ class TestTreeStore(unittest.TestCase):
         creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
         treestore.upload( 'v1.0', creationTime, self.srcTree, CaptureUploadProgress() )
         treestore.upload( 'v1.3', creationTime, self.srcTree3, CaptureUploadProgress() )
+        treestore.upload( 'v1.4', creationTime, self.srcTree4, CaptureUploadProgress() )
 
         testdir = makeEmptyDir( os.path.join( self.workdir, 'test' ) )
 
@@ -212,6 +222,7 @@ class TestTreeStore(unittest.TestCase):
         assertContains( "code/file2.py", self.FILE2_A )
         assertDoesntExist( "assets/car-01.db" )
         assertContains( "code/file4.py", self.FILE4 )
+        assertContains( "text/text", self.FILE5 )
         assertExists( S3TS_PACKAGEFILE )
 
         # Sync back to the first package
@@ -234,6 +245,12 @@ class TestTreeStore(unittest.TestCase):
         assertDoesntExist( "assets/car-01.db" )
         assertContains( "code/file4.py", self.FILE4 )
         assertExists( S3TS_PACKAGEFILE )
+
+        # Sync to test replacing a directory with a file
+        pkg = treestore.find('v1.4')
+        treestore.download( pkg, CaptureDownloadProgress() ) 
+        treestore.sync( pkg, testdir, CaptureInstallProgress() )
+        assertContains( "text", self.FILE5 )
 
     def test_s3_treestore(self):
         # Create an s3 backed treestore
