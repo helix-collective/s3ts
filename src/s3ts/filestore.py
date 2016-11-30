@@ -1,4 +1,6 @@
-import json, os, tempfile
+import json, os
+
+from s3ts import filewriter
 
 class FileStore(object):
 
@@ -82,16 +84,10 @@ class LocalFileStore(FileStore):
         if not os.path.isdir( dir ):
             os.makedirs( dir )
 
-        # Write to a unique temporary file, and then move it to the
-        # final filename, in an attempt to get atomic updates
-        with tempfile.NamedTemporaryFile( dir=os.path.dirname(path), delete=False ) as f:
+        # Do our best to be atomic in our updates here, in case
+        # another process is simultaneously updating the file
+        with filewriter.atomicFileWriter(path) as f:
             f.write(body)
-            # Need to flush both at libc and kernel layers here to
-            # ensure that the os.rename() below works correctly under
-            # windows
-            f.flush()
-            os.fsync(f.fileno())
-        os.rename( f.name, path )
 
     def remove( self, path ):
         path = self.__path(path)

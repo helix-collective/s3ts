@@ -4,7 +4,7 @@ from s3ts.treestore import TreeStore
 from s3ts.filestore import LocalFileStore
 from s3ts.config import TreeStoreConfig
 
-class UploadStats:
+class TransferStats:
     def __init__(self):
         self.bytesUploaded = 0
         self.bytesCached = 0
@@ -18,12 +18,30 @@ class UploadStats:
     def done(self):
         self.rusage1 = resource.getrusage(resource.RUSAGE_SELF)
         self.time1 = time.time()
-        print "%d bytes uploaded" % self.bytesUploaded
-        print "%d bytes cached" % self.bytesCached
-        print "%f seconds elapsed time" % (self.time1 - self.time0)
-        print "%f seconds user time" % (self.rusage1.ru_utime - self.rusage0.ru_utime)
-        print "%f seconds system time" % (self.rusage1.ru_stime - self.rusage0.ru_stime)
+        print "{:,} bytes transferred".format(self.bytesUploaded)
+        print "{:,} bytes cached".format(self.bytesCached)
+        print "{} seconds elapsed time".format((self.time1 - self.time0))
+        print "{} seconds user time".format((self.rusage1.ru_utime - self.rusage0.ru_utime))
+        print "{} seconds system time".format((self.rusage1.ru_stime - self.rusage0.ru_stime))
+
+class InstallStats:
+    def __init__(self):
+        self.bytesInstalled = 0
+        self.rusage0 = resource.getrusage(resource.RUSAGE_SELF)
+        self.time0 = time.time()
         
+    def progress(self, bytesInstalled):
+        self.bytesInstalled += bytesInstalled
+
+    def done(self):
+        self.rusage1 = resource.getrusage(resource.RUSAGE_SELF)
+        self.time1 = time.time()
+        print "{:,} bytes copied".format(self.bytesInstalled)
+        print "{} seconds elapsed time".format((self.time1 - self.time0))
+        print "{:,} MB per second".format(int((self.bytesInstalled/(self.time1 - self.time0))/1e6))
+        print "{} seconds user time".format((self.rusage1.ru_utime - self.rusage0.ru_utime))
+        print "{} seconds system time".format((self.rusage1.ru_stime - self.rusage0.ru_stime))
+
 
 def runtest(testContent):
     print "----------------------------------------------------------------------"
@@ -38,15 +56,31 @@ def runtest(testContent):
 
         creationTime = datetime.datetime.now()
         print "* Initial upload"
-        stats = UploadStats()
+        stats = TransferStats()
         ts.upload( "test", creationTime, testContent, stats.progress)
         stats.done()
         print
         print "* Repeat upload"
-        stats = UploadStats()
+        stats = TransferStats()
         ts.upload( "test", creationTime, testContent, stats.progress)
         stats.done()
 
+        print
+        print "* Download"
+        stats = TransferStats()
+        pkg = ts.find("test")
+        ts.download(pkg, stats.progress)
+        stats.done()
+
+        print
+        print "* Clean installation"
+        installDir = os.path.join(dir,"install")
+        os.makedirs(installDir)
+        stats = InstallStats()
+        pkg = ts.find("test")
+        ts.install(pkg, installDir, stats.progress)
+        stats.done()
+            
     finally:
         shutil.rmtree(dir)
 
@@ -56,3 +90,4 @@ def main():
         
 if __name__ == '__main__':
     main()
+

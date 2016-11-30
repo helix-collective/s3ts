@@ -2,7 +2,7 @@ import os, hashlib, zlib, tempfile, datetime, time, shutil
 import requests
 
 from s3ts.config import TreeStoreConfig, TreeStoreConfigJS, InstallProperties, writeInstallProperties, S3TS_PROPERTIES
-from s3ts import package
+from s3ts import package, filewriter
 
 CONFIG_PATH = 'config'
 TREES_PATH = 'trees'
@@ -218,33 +218,22 @@ class TreeStore(object):
             if not os.path.exists( targetDir ):
                 os.makedirs( targetDir )
 
-            f = None
-            try:
-                filesha1 = hashlib.sha1()
-                with tempfile.NamedTemporaryFile(delete=False,dir=targetDir) as f:
-                    for chunk in pf.chunks:
-                        cpath = self.__chunkPath( self.localCache, chunk.sha1, chunk.encoding )
-                        buf = self.localCache.get( cpath )
-                        buf = self.__decompress( buf, chunk.encoding )
-                        filesha1.update( buf )
-                        self.__checkSha1( buf, chunk.sha1, cpath )
-                        f.write( buf )
-                        progressCB( len(buf) )
+            filesha1 = hashlib.sha1()
+            # We can update the file in place, because we never install
+            # to a directory tree that is in use.
+            with filewriter.InPlaceFileWriter(targetPath) as f:
+                for chunk in pf.chunks:
+                    cpath = self.__chunkPath( self.localCache, chunk.sha1, chunk.encoding )
+                    buf = self.localCache.get( cpath )
+                    buf = self.__decompress( buf, chunk.encoding )
+                    filesha1.update( buf )
+                    f.write( buf )
+                    progressCB( len(buf) )
 
-                    # Need to flush both at libc and kernel layers here to
-                    # ensure that the os.rename() below works correctly under
-                    # windows
-                    f.flush()
-                    os.fsync(f.fileno())
+            if filesha1.hexdigest() != pf.sha1:
+                raise RuntimeError, "sha1 for {0} doesn't match".format(pf.path)
 
-                if filesha1.hexdigest() != pf.sha1:
-                    raise RuntimeError, "sha1 for {0} doesn't match".format(pf.path)
-
-                self.outVerbose( "Installing {}", targetPath )
-                os.rename( f.name, targetPath )
-            except:
-                if f: os.unlink( f.name )
-                raise
+            self.outVerbose( "Wrote {}", targetPath )
 
     def compareInstall( self, pkg, localPath ):
         """
