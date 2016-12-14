@@ -106,7 +106,7 @@ class TestTreeStore(unittest.TestCase):
 
         # Upload 2 trees
         creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
-        treestore.upload( 'v1.0', creationTime, self.srcTree, CaptureUploadProgress() )
+        treestore.upload( 'v1.0', '', creationTime, self.srcTree, CaptureUploadProgress() )
         pkg = treestore.find( 'v1.0' )
 
         # Confirm it's in the index
@@ -150,7 +150,7 @@ class TestTreeStore(unittest.TestCase):
         self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
 
         # Test the flushStore function has nothing to remove)
-        treestore.upload( 'extra', creationTime, self.srcTree2, CaptureUploadProgress() )
+        treestore.upload( 'extra', '', creationTime, self.srcTree2, CaptureUploadProgress() )
         removed = treestore.flushStore()
         self.assertEquals(len(removed), 0)
 
@@ -161,7 +161,7 @@ class TestTreeStore(unittest.TestCase):
         removed = treestore.flushStore()
         self.assertTrue(len(removed) > 0)
 
-        treestore.upload( 'v1.0', creationTime, self.srcTree, CaptureUploadProgress() )
+        treestore.upload( 'v1.0', '', creationTime, self.srcTree, CaptureUploadProgress() )
 
         # Initially the local cache should contain chunks for v1.0 and extra. Empty
         # the local cache by successive flush operations
@@ -181,9 +181,9 @@ class TestTreeStore(unittest.TestCase):
         treestore = TreeStore.create( fileStore, localCache, TreeStoreConfig( 10, True ) )
 
         creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
-        treestore.upload( 'v1.0', creationTime, self.srcTree, CaptureUploadProgress() )
-        treestore.upload( 'v1.3', creationTime, self.srcTree3, CaptureUploadProgress() )
-        treestore.upload( 'v1.4', creationTime, self.srcTree4, CaptureUploadProgress() )
+        treestore.upload( 'v1.0', '', creationTime, self.srcTree, CaptureUploadProgress() )
+        treestore.upload( 'v1.3', '', creationTime, self.srcTree3, CaptureUploadProgress() )
+        treestore.upload( 'v1.4', '', creationTime, self.srcTree4, CaptureUploadProgress() )
 
         testdir = makeEmptyDir( os.path.join( self.workdir, 'test' ) )
 
@@ -272,7 +272,7 @@ class TestTreeStore(unittest.TestCase):
 
             # Upload it as a tree
             creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
-            treestore.upload( 'v1.0', creationTime, self.srcTree, CaptureUploadProgress() )
+            treestore.upload( 'v1.0', '', creationTime, self.srcTree, CaptureUploadProgress() )
             pkg = treestore.find( 'v1.0' )
 
             # Confirm it's in the index
@@ -376,8 +376,8 @@ class TestTreeStore(unittest.TestCase):
             # Confirm we can write the different values to the same path in both treestores,
             # and the different prefix keeps them separate independent
             creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
-            treestore1.upload( 'release', creationTime, self.srcTree, CaptureUploadProgress() )
-            treestore2.upload( 'release', creationTime, self.srcTree2, CaptureUploadProgress() )
+            treestore1.upload( 'release', '', creationTime, self.srcTree, CaptureUploadProgress() )
+            treestore2.upload( 'release', '', creationTime, self.srcTree2, CaptureUploadProgress() )
             pkg1 = treestore1.find( 'release' )
             pkg2 = treestore2.find( 'release' )
             self.assertEquals(len(pkg1.files),3)
@@ -403,7 +403,7 @@ class TestTreeStore(unittest.TestCase):
 
             # Upload it as a tree
             creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
-            treestore.uploadMany( 'v1.0', creationTime, self.srcTree, self.srcVariant, CaptureUploadProgress() )
+            treestore.uploadMany( 'v1.0', '', creationTime, self.srcTree, self.srcVariant, CaptureUploadProgress() )
             pkg = treestore.find( 'v1.0:kiosk-01' )
 
             # Confirm it's in the index

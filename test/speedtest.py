@@ -57,12 +57,12 @@ def runtest(testContent):
         creationTime = datetime.datetime.now()
         print "* Initial upload"
         stats = TransferStats()
-        ts.upload( "test", creationTime, testContent, stats.progress)
+        ts.upload( "test", "", creationTime, testContent, stats.progress)
         stats.done()
         print
         print "* Repeat upload"
         stats = TransferStats()
-        ts.upload( "test", creationTime, testContent, stats.progress)
+        ts.upload( "test", "", creationTime, testContent, stats.progress)
         stats.done()
 
         print

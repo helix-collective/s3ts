@@ -10,12 +10,12 @@ rm -rf $TEST_DIR
 export S3TS_LOCALCACHE=$TEST_DIR/cache
 
 s3ts() {
-    PYTHONPATH=src ./python-venv/bin/python src/s3ts/main.py "$@"
+    PYTHONPATH=src python src/s3ts/main.py "$@"
 }
 
 s3ts init
 s3ts upload --dry-run src-1.0 src
-s3ts upload src-1.0 src
+s3ts upload --description "Some package" src-1.0 src
 s3ts upload --verbose test test
 s3ts prime-cache src
 s3ts download --dry-run src-1.0

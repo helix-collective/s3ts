@@ -61,7 +61,7 @@ class TreeStore(object):
         """
         self.outVerbose = outVerbose
 
-    def upload( self, treeName, creationTime, localPath, progressCB ):
+    def upload( self, treeName, description, creationTime, localPath, progressCB ):
         """Creates a package for the content of localPath.
 
         This uploads the package definition and any file chunks not already uploaded.
@@ -69,13 +69,13 @@ class TreeStore(object):
 
         """
         packageFiles = self.__storeFiles( self.pkgStore, localPath, progressCB )
-        pkg = package.Package( treeName, creationTime, packageFiles )
+        pkg = package.Package( treeName, description, creationTime, packageFiles )
         if not self.dryRun:
             self.outVerbose( "Uploading package definition for {}", treeName )
             self.pkgStore.putToJson( self.__treeNamePath( self.pkgStore, treeName ), pkg, package.PackageJS() )
         return pkg
 
-    def uploadMany( self, treeName, creationTime, commonLocalPath, variantsLocalPath, progressCB ):
+    def uploadMany( self, treeName, description, creationTime, commonLocalPath, variantsLocalPath, progressCB ):
         """Creates multiple package for the content of commonPath including variantsLocalPath files
         for each directory found in the variantsLocalPath.
 
@@ -91,7 +91,7 @@ class TreeStore(object):
                 indivisualPackageFiles = self.__storeFiles( self.pkgStore, os.path.join( variantsLocalPath, variantPath ), progressCB )
                 # merge the common + indivisual package
                 mergedPackageFiles = packageFiles + indivisualPackageFiles
-                pkg = package.Package( variantTreeName, creationTime, mergedPackageFiles)
+                pkg = package.Package( variantTreeName, description, creationTime, mergedPackageFiles)
                 self.pkgStore.putToJson( self.__treeNamePath( self.pkgStore, variantTreeName ), pkg, package.PackageJS() )
 
     def find( self, treeName ):

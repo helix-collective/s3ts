@@ -116,16 +116,16 @@ def info( treename ):
     for pf in pkg.files:
         print '    {0} ({1} chunks, {2} bytes)'.format( pf.path, len(pf.chunks), pf.size() )
 
-def upload( treename, localdir, dryRun, verbose ):
+def upload( treename, description, localdir, dryRun, verbose ):
     creationTime = datetime.datetime.now()
     treeStore = openTreeStore(dryRun=dryRun,verbose=verbose)
-    treeStore.upload( treename, creationTime, localdir, UploadProgress() )
+    treeStore.upload( treename, description, creationTime, localdir, UploadProgress() )
     print
 
-def uploadMany( treename, localdir, kioskDir ):
+def uploadMany( treename, description, localdir, kioskDir ):
     creationTime = datetime.datetime.now()
     treeStore = openTreeStore()
-    treeStore.uploadMany(treename, creationTime, localdir, kioskDir, UploadProgress())
+    treeStore.uploadMany(treename, description, creationTime, localdir, kioskDir, UploadProgress())
     print
 
 def download( treename, dryRun, verbose ):
@@ -244,9 +244,10 @@ p = subparsers.add_parser('info', help='Show information about a tree')
 p.add_argument('treename', action='store', help='The name of the tree')
 
 p = subparsers.add_parser('upload', help='Upload a tree from the local filesystem')
-p.set_defaults(dryRun=False,verbose=False)
+p.set_defaults(dryRun=False,verbose=False,description='')
 p.add_argument('--dry-run', dest='dryRun', action='store_true')
 p.add_argument('--verbose', dest='verbose', action='store_true')
+p.add_argument('--description', dest='description', action='store')
 p.add_argument('treename', action='store', help='The name of the tree')
 p.add_argument('localdir', action='store', help='The local directory path')
 
@@ -294,6 +295,8 @@ p = subparsers.add_parser('prime-cache', help='Prime the local cache with the co
 p.add_argument('localdir', action='store', help='The local directory path')
 
 p = subparsers.add_parser('upload-many', help='Upload multiple trees from the local filesystem')
+p.set_defaults(description='')
+p.add_argument('--description', dest='description', action='store')
 p.add_argument('treename', action='store', help='The name of the tree')
 p.add_argument('localdir', action='store', help='The local directory path')
 p.add_argument('local_variant_dir', action='store', help='The local variant path')
@@ -317,7 +320,7 @@ def main():
     elif args.commandName == 'info':
         info( args.treename )
     elif args.commandName == 'upload':
-        upload( args.treename, args.localdir, args.dryRun, args.verbose )
+        upload( args.treename, args.description, args.localdir, args.dryRun, args.verbose )
     elif args.commandName == 'download':
         download( args.treename, args.dryRun, args.verbose )
     elif args.commandName == 'flush':
@@ -337,7 +340,7 @@ def main():
     elif args.commandName == 'prime-cache':
         primeCache( args.localdir )
     elif args.commandName == 'upload-many':
-        uploadMany(args.treename, args.localdir, args.local_variant_dir)
+        uploadMany(args.treename, args.description, args.localdir, args.local_variant_dir)
     elif args.commandName == 'validate-local-cache':
         validateCache()
     elif args.commandName == 'compare-packages':

@@ -8,8 +8,9 @@ ENCODING_ZLIB = 'zlib'
 class Package(object):
     """represents a collection of files to be downloaded."""
     
-    def __init__( self, name, creationTime, files ):
+    def __init__( self, name, description, creationTime, files ):
         self.name = name
+        self.description = description
         self.creationTime = creationTime
         self.files = files
 
@@ -42,6 +43,7 @@ class PackageJS(object):
     def fromJson( self, jv ):
         return Package(
             jv['name'],
+            jv.get('description', ''),
             datetimeFromIso( jv['creationTime'] ),
             [self.packageFileJS.fromJson(jv1) for jv1 in jv['files']]
         )
@@ -49,6 +51,7 @@ class PackageJS(object):
     def toJson( self, v ):
         return {
             'name' : v.name,
+            'description' : v.description,
             'creationTime' : v.creationTime.isoformat(),
             'files' : [ self.packageFileJS.toJson(f) for f in v.files ],
         }
@@ -109,6 +112,7 @@ def packageDiff(package1, package2):
     
     diffPackage = Package(
         name="%s->%s" % (package1.name,package2.name),
+        description='',
         creationTime=package2.creationTime,
         files=[]
         )
