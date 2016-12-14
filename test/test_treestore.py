@@ -383,6 +383,41 @@ class TestTreeStore(unittest.TestCase):
             self.assertEquals(len(pkg1.files),3)
             self.assertEquals(len(pkg2.files),4)
 
+    def test_s3_merged_package(self):
+        # Test the creation and subsequent installation of merged packages
+        # Requires these environment variables set
+        #
+        #   AWS_ACCESS_KEY_ID
+        #   AWS_SECRET_ACCESS_KEY
+        #   S3TS_BUCKET
+        #
+        # NB: **this will only work if the bucket is empty
+
+        s3c = boto.connect_s3()
+        bucket = s3c.get_bucket( os.environ['S3TS_BUCKET'] )
+
+        with EmptyS3Bucket(bucket):
+            localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
+            treestore = TreeStore.create( S3FileStore( bucket), localCache, TreeStoreConfig( 100, True ) )
+            creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
+            treestore.upload( 'src1', '', creationTime, self.srcTree, CaptureUploadProgress() )
+            treestore.upload( 'src2', '', creationTime, self.srcTree2, CaptureUploadProgress() )
+            treestore.upload( 'src3', '', creationTime, self.srcTree3, CaptureUploadProgress() )
+            treestore.createMerged( 'merged', creationTime, { '.' : 'src1', 'subdir-a' : 'src2', 'subdir-b' : 'src3'})
+            pkg = treestore.find( 'merged' )
+            treestore.download( pkg, CaptureDownloadProgress() )
+            destTree = os.path.join( self.workdir, 'merged' )
+            treestore.install( pkg, destTree, CaptureInstallProgress() )
+
+            def assertSameContent( path1, path2 ):
+                with open(path1) as f1:
+                    with open(path2) as f2:
+                        self.assertEquals( f1.read(), f2.read() )
+
+            assertSameContent(os.path.join(destTree, "code/file1.py"), os.path.join(self.srcTree, "code/file1.py"))
+            assertSameContent(os.path.join(destTree, "subdir-a/code/file4.py"), os.path.join(self.srcTree2, "code/file4.py"))
+            assertSameContent(os.path.join(destTree, "subdir-b/text/text"), os.path.join(self.srcTree3, "text/text"))
+
     def test_s3_many_treestore(self):
         # Create an s3 backed treestore
         # Requires these environment variables set

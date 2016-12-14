@@ -26,6 +26,7 @@ s3ts install --verbose test $TEST_DIR/test
 s3ts verify-install test $TEST_DIR/test
 s3ts list
 s3ts info src-1.0
+s3ts create-merged merge dir1:src-1.0 dir2:test
 s3ts rename src-1.0 src-1.1
 s3ts remove --yes src-1.1
 s3ts flush --verbose --dry-run

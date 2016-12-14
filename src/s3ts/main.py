@@ -128,6 +128,26 @@ def uploadMany( treename, description, localdir, kioskDir ):
     treeStore.uploadMany(treename, description, creationTime, localdir, kioskDir, UploadProgress())
     print
 
+def createMerged( treename, packageArgs, dryRun, verbose ):
+    creationTime = datetime.datetime.now()
+    treeStore = openTreeStore(dryRun=dryRun,verbose=verbose)
+    packageMap = {}
+
+    # Convert the package command line arguments from form
+    #    [ "subdir1:pname1", "subdir2:pname2", ... ]
+    # to
+    #    { "subdir1":"pname1", "subdir2":"pname2", ... }
+    
+    for s in packageArgs:
+        fields = s.split( ':', 2 )
+        if len(fields) != 2:
+            sys.stderr.write( 'create-merge arguments must be of form SUBDIR:TREENAME' )
+            sys.exit(1)
+        packageMap[fields[0]] = fields[1]
+    
+    treeStore.createMerged( treename, creationTime, packageMap)
+    print                
+
 def download( treename, dryRun, verbose ):
     treeStore = openTreeStore(dryRun=dryRun,verbose=verbose)
     pkg = treeStore.find( treename )
@@ -301,6 +321,13 @@ p.add_argument('treename', action='store', help='The name of the tree')
 p.add_argument('localdir', action='store', help='The local directory path')
 p.add_argument('local_variant_dir', action='store', help='The local variant path')
 
+p = subparsers.add_parser('create-merged', help='Create a new package by merging existing packages')
+p.set_defaults(dryRun=False,verbose=False)
+p.add_argument('--dry-run', dest='dryRun', action='store_true')
+p.add_argument('--verbose', dest='verbose', action='store_true')
+p.add_argument('treename', action='store', help='The name of the merged tree')
+p.add_argument('package_args', nargs='+', metavar='DIR:RNAME')
+
 p = subparsers.add_parser('compare-packages', help='Compare two packages')
 p.add_argument('package1', action='store', help='The first package')
 p.add_argument('package2', action='store', help='The second package')
@@ -341,6 +368,8 @@ def main():
         primeCache( args.localdir )
     elif args.commandName == 'upload-many':
         uploadMany(args.treename, args.description, args.localdir, args.local_variant_dir)
+    elif args.commandName == 'create-merged':
+        createMerged(args.treename, args.package_args, args.dryRun, args.verbose)
     elif args.commandName == 'validate-local-cache':
         validateCache()
     elif args.commandName == 'compare-packages':

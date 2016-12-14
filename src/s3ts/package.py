@@ -88,6 +88,12 @@ class FileChunkJS(object):
     def fromJson( self, jv ):
         return FileChunk( jv['sha1'], jv['size'], jv['encoding'], jv.get('url') )
 
+def pathFromFileSystem(fspath):
+    """
+    Turn a local filesystem path into a package file path.
+    (Inside the package metadata, we always store paths in unix format)
+    """
+    return fspath.replace("\\", "/")
 
 def packageDiff(package1, package2):
     """

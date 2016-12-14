@@ -94,6 +94,28 @@ class TreeStore(object):
                 pkg = package.Package( variantTreeName, description, creationTime, mergedPackageFiles)
                 self.pkgStore.putToJson( self.__treeNamePath( self.pkgStore, variantTreeName ), pkg, package.PackageJS() )
 
+    def createMerged( self, treeName, creationTime, packageMap ):
+        """Create a new package by merging together existing packages.
+
+        `packageMap` is a dictionary with subdirectories as keys, and
+        package names as values.
+        """
+        files = []
+        description = "merged package:"
+        
+        for subdir,subTreeName in packageMap.items():
+            subpackage = self.find( subTreeName )
+            for file in subpackage.files:
+                path = package.pathFromFileSystem( os.path.normpath( os.path.join(subdir, file.path) ) )
+                files.append( package.PackageFile( file.sha1, path, file.chunks ) )
+            description += "\n    {} : {} (created {})".format( subdir, subTreeName, subpackage.creationTime.isoformat() )
+
+        pkg = package.Package( treeName, description, creationTime, files )
+        if not self.dryRun:
+            self.outVerbose( "Uploading package definition for {}", treeName )
+            self.pkgStore.putToJson( self.__treeNamePath( self.pkgStore, treeName ), pkg, package.PackageJS() )
+        return pkg
+        
     def find( self, treeName ):
         """Return the package definition for the given name"""
         return self.pkgStore.getFromJson( self.__treeNamePath( self.pkgStore, treeName ), package.PackageJS() )
@@ -401,8 +423,7 @@ class TreeStore(object):
                 filesha1.update( buf )
                 chunks.append( self.__storeChunk( store, chunksha1.hexdigest(), buf, progressCB ) )
         self.outVerbose( "file {} has hash {}", rpath, filesha1.hexdigest() )
-        #make the package path consistent and have only forward slash
-        rpath = rpath.replace("\\", "/")
+        rpath = package.pathFromFileSystem( rpath )
         return package.PackageFile( filesha1.hexdigest(), rpath, chunks )
 
     def __storeChunk( self, store, sha1, buf, progressCB ):
