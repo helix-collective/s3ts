@@ -10,6 +10,13 @@ def datetimeFromIso( s ):
         return datetime.datetime.strptime( s, '%Y-%m-%dT%H:%M:%S' )
         
 
+def allFilePaths(path):
+    """Find all of the files below path"""
+    result = []
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            result.append(os.path.normpath(os.path.join(os.path.relpath(root,path), file)))
+    return result
 
 def removeEmptyDirectories(path, removeRoot):
   """Remove empty directories recursively"""

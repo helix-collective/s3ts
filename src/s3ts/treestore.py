@@ -206,9 +206,18 @@ class TreeStore(object):
                 shutil.rmtree( localPath )
             os.makedirs( localPath )
         else:
-            # Synchronise the existing content.
-            syncPkg,pathsToRemove = package.packageDiff( existingPkg, pkg )
+            # Synchronise the existing content. To ensure the
+            # drectory is clean, we remove every exising file that
+            # is not present in the new pkg
+            syncPkg,_ = package.packageDiff( existingPkg, pkg )
+            localPaths = set( utils.allFilePaths(localPath) )
 
+            # normpath is required here to turn a package path (delimited by '/')
+            # into a local filesystem path (delimited by '\' on windows)
+            targetPaths = set( [os.path.normpath(f.path) for f in pkg.files] )
+            pathsToRemove = localPaths.difference(targetPaths)
+            pathsToRemove.discard(package.S3TS_PACKAGEFILE)
+            
             # Remove the existing package from disk, so that if anything
             # fails during the sync, we start from scratch next time
             os.unlink( os.path.join( localPath, package.S3TS_PACKAGEFILE ) )
@@ -277,9 +286,10 @@ class TreeStore(object):
             for file in files:
                 installedFiles.append(os.path.relpath( os.path.join(root, file), localPath ))
         installedFiles = set(installedFiles)
-        installedFiles.remove( S3TS_PROPERTIES )
+        installedFiles.discard( S3TS_PROPERTIES )
+        installedFiles.discard( package.S3TS_PACKAGEFILE )
 
-        packageFiles = [f.path for f in pkg.files]
+        packageFiles = [os.path.normpath(f.path) for f in pkg.files]
         packageFiles = set(packageFiles)
 
         class Result: pass
@@ -291,8 +301,9 @@ class TreeStore(object):
 
         # 2) verify the contents of each file
         for pf in pkg.files:
-            if pf.path in installedFiles:
-                path = os.path.join(localPath, pf.path)
+            ppath = os.path.normpath(pf.path)
+            if ppath in installedFiles:
+                path = os.path.join(localPath, ppath)
                 filesha1 = hashlib.sha1()
                 i = 0
                 with open( path, 'rb' ) as f:
@@ -302,10 +313,10 @@ class TreeStore(object):
                         chunksha1.update(buf)
                         filesha1.update(buf)
                         if chunksha1.hexdigest() != chunk.sha1:
-                            result.diffs.add( pf.path )
+                            result.diffs.add( ppath )
                         i += len(buf)
                 if filesha1.hexdigest() != pf.sha1:
-                    result.diffs.add( pf.path )
+                    result.diffs.add( ppath )
 
         return result
 

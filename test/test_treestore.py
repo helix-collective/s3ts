@@ -194,7 +194,13 @@ class TestTreeStore(unittest.TestCase):
             self.assertEquals( open( os.path.join(testdir, path) ).read(), text )
 
         def assertDoesntExist( path ):
-            self.assertFalse( os.path.exists( os.path.join(testdir, path) ) ) 
+            self.assertFalse( os.path.exists( os.path.join(testdir, path) ) )
+
+        def assertInstalled(pkg, testdir):
+            result = treestore.compareInstall(pkg, testdir)
+            self.assertEquals( result.missing, set() )
+            self.assertEquals( result.extra, set() )
+            self.assertEquals( result.diffs, set() )
         
         # sync a package to an empty directory
         pkg = treestore.find('v1.0')
@@ -204,6 +210,7 @@ class TestTreeStore(unittest.TestCase):
         assertContains( "code/file2.py", self.FILE2 )
         assertContains( "assets/car-01.db", self.CAR01 )
         assertExists( S3TS_PACKAGEFILE )
+        assertInstalled( pkg, testdir )
 
         # Re-sync the same package
         pkg = treestore.find('v1.0')
@@ -213,6 +220,7 @@ class TestTreeStore(unittest.TestCase):
         assertContains( "code/file2.py", self.FILE2 )
         assertContains( "assets/car-01.db", self.CAR01 )
         assertExists( S3TS_PACKAGEFILE )
+        assertInstalled( pkg, testdir )
 
         # Sync to a different package
         pkg = treestore.find('v1.3')
@@ -224,6 +232,7 @@ class TestTreeStore(unittest.TestCase):
         assertContains( "code/file4.py", self.FILE4 )
         assertContains( "text/text", self.FILE5 )
         assertExists( S3TS_PACKAGEFILE )
+        assertInstalled( pkg, testdir )
 
         # Sync back to the first package
         pkg = treestore.find('v1.0')
@@ -234,6 +243,7 @@ class TestTreeStore(unittest.TestCase):
         assertContains( "assets/car-01.db", self.CAR01 )
         assertDoesntExist( "code/file4.py" )
         assertExists( S3TS_PACKAGEFILE )
+        assertInstalled( pkg, testdir )
 
         # Remove the package file, and sync the second package again
         os.unlink( os.path.join( testdir, S3TS_PACKAGEFILE ) )
@@ -245,12 +255,22 @@ class TestTreeStore(unittest.TestCase):
         assertDoesntExist( "assets/car-01.db" )
         assertContains( "code/file4.py", self.FILE4 )
         assertExists( S3TS_PACKAGEFILE )
+        assertInstalled( pkg, testdir )
+
+        # Add an extra file not in the package, and ensure
+        # that syncing deletes it
+        with open( os.path.join(testdir, "debug.log"), 'w') as f:
+            f.write( "something" )
+        pkg = treestore.find('v1.3')
+        treestore.sync( pkg, testdir, CaptureInstallProgress() )
+        assertInstalled( pkg, testdir )
 
         # Sync to test replacing a directory with a file
         pkg = treestore.find('v1.4')
         treestore.download( pkg, CaptureDownloadProgress() ) 
         treestore.sync( pkg, testdir, CaptureInstallProgress() )
         assertContains( "text", self.FILE5 )
+        assertInstalled( pkg, testdir )
 
     def test_s3_treestore(self):
         # Create an s3 backed treestore
