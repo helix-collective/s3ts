@@ -6,6 +6,7 @@ from s3ts.config import TreeStoreConfig, readInstallProperties, S3TS_PROPERTIES
 from s3ts.treestore import TreeStore
 from s3ts.utils import datetimeFromIso
 from s3ts.package import PackageJS, S3TS_PACKAGEFILE
+from s3ts.metapackage import MetaPackage, SubPackage
 
 import boto
 import logging
@@ -107,10 +108,10 @@ class TestTreeStore(unittest.TestCase):
         # Upload 2 trees
         creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
         treestore.upload( 'v1.0', '', creationTime, self.srcTree, CaptureUploadProgress() )
-        pkg = treestore.find( 'v1.0' )
+        pkg = treestore.findPackage( 'v1.0' )
 
         # Confirm it's in the index
-        self.assertEquals( treestore.list(), ['v1.0'] )
+        self.assertEquals( treestore.listPackages(), ['v1.0'] )
 
         # Verify it
         treestore.verify( pkg )
@@ -143,7 +144,7 @@ class TestTreeStore(unittest.TestCase):
 
         # Rename the tree, and check that installing that is the same
         treestore.rename( 'v1.0', 'v1.0x' )
-        pkg = treestore.find( 'v1.0x' )
+        pkg = treestore.findPackage( 'v1.0x' )
         treestore.download( pkg, CaptureDownloadProgress() )
         destTree = os.path.join( self.workdir, 'dest-2' )
         treestore.install( pkg, destTree, CaptureInstallProgress() )
@@ -203,7 +204,7 @@ class TestTreeStore(unittest.TestCase):
             self.assertEquals( result.diffs, set() )
         
         # sync a package to an empty directory
-        pkg = treestore.find('v1.0')
+        pkg = treestore.findPackage('v1.0')
         treestore.download( pkg, CaptureDownloadProgress() ) 
         treestore.sync( pkg, testdir, CaptureInstallProgress() )
         assertContains( "code/file1.py", self.FILE1 )
@@ -213,7 +214,7 @@ class TestTreeStore(unittest.TestCase):
         assertInstalled( pkg, testdir )
 
         # Re-sync the same package
-        pkg = treestore.find('v1.0')
+        pkg = treestore.findPackage('v1.0')
         treestore.download( pkg, CaptureDownloadProgress() ) 
         treestore.sync( pkg, testdir, CaptureInstallProgress() )
         assertContains( "code/file1.py", self.FILE1 )
@@ -223,7 +224,7 @@ class TestTreeStore(unittest.TestCase):
         assertInstalled( pkg, testdir )
 
         # Sync to a different package
-        pkg = treestore.find('v1.3')
+        pkg = treestore.findPackage('v1.3')
         treestore.download( pkg, CaptureDownloadProgress() ) 
         treestore.sync( pkg, testdir, CaptureInstallProgress() )
         assertContains( "code/file1.py", self.FILE1 )
@@ -235,7 +236,7 @@ class TestTreeStore(unittest.TestCase):
         assertInstalled( pkg, testdir )
 
         # Sync back to the first package
-        pkg = treestore.find('v1.0')
+        pkg = treestore.findPackage('v1.0')
         treestore.download( pkg, CaptureDownloadProgress() ) 
         treestore.sync( pkg, testdir, CaptureInstallProgress() )
         assertContains( "code/file1.py", self.FILE1 )
@@ -247,7 +248,7 @@ class TestTreeStore(unittest.TestCase):
 
         # Remove the package file, and sync the second package again
         os.unlink( os.path.join( testdir, S3TS_PACKAGEFILE ) )
-        pkg = treestore.find('v1.3')
+        pkg = treestore.findPackage('v1.3')
         treestore.download( pkg, CaptureDownloadProgress() ) 
         treestore.sync( pkg, testdir, CaptureInstallProgress() )
         assertContains( "code/file1.py", self.FILE1 )
@@ -261,17 +262,51 @@ class TestTreeStore(unittest.TestCase):
         # that syncing deletes it
         with open( os.path.join(testdir, "debug.log"), 'w') as f:
             f.write( "something" )
-        pkg = treestore.find('v1.3')
+        pkg = treestore.findPackage('v1.3')
         treestore.sync( pkg, testdir, CaptureInstallProgress() )
         assertInstalled( pkg, testdir )
 
         # Sync to test replacing a directory with a file
-        pkg = treestore.find('v1.4')
+        pkg = treestore.findPackage('v1.4')
         treestore.download( pkg, CaptureDownloadProgress() ) 
         treestore.sync( pkg, testdir, CaptureInstallProgress() )
         assertContains( "text", self.FILE5 )
         assertInstalled( pkg, testdir )
 
+    def test_metapackages(self):
+        # Create a file system backed treestore
+        fileStore = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'fs' ) ) )
+        localCache = LocalFileStore( makeEmptyDir( os.path.join( self.workdir, 'cache' ) ) )
+        treestore = TreeStore.create( fileStore, localCache, TreeStoreConfig( 10, True ) )
+        
+        creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
+        treestore.upload( 'v1.0', '', creationTime, self.srcTree, CaptureUploadProgress() )
+        treestore.upload( 'v1.3', '', creationTime, self.srcTree3, CaptureUploadProgress() )
+        treestore.upload( 'v1.4', '', creationTime, self.srcTree4, CaptureUploadProgress() )
+
+        meta1 = MetaPackage(
+            name = 'meta1',
+            description = '',
+            creationTime = creationTime,
+            components = [
+                SubPackage( 'dir-1', 'v1.0' ),
+                SubPackage( 'dir-2', 'v1.3' ),
+            ]
+        )
+
+        meta1.verify(treestore,{})
+        treestore.uploadMetaPackage(meta1)
+        meta1p = treestore.find( 'meta1', {})
+        treestore.download(meta1p, CaptureDownloadProgress() )
+
+        # Install it
+        destTree = os.path.join( self.workdir, 'dest-1' )
+        treestore.install(meta1p, destTree, CaptureInstallProgress() )
+        def assertContains( path, text ):
+            self.assertEquals( open( os.path.join(destTree, path) ).read(), text )
+        assertContains("dir-1/code/file1.py", self.FILE1)
+        assertContains("dir-2/text/text", self.FILE5)
+                
     def test_s3_treestore(self):
         # Create an s3 backed treestore
         # Requires these environment variables set
@@ -293,10 +328,10 @@ class TestTreeStore(unittest.TestCase):
             # Upload it as a tree
             creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
             treestore.upload( 'v1.0', '', creationTime, self.srcTree, CaptureUploadProgress() )
-            pkg = treestore.find( 'v1.0' )
+            pkg = treestore.findPackage( 'v1.0' )
 
             # Confirm it's in the index
-            self.assertEquals( treestore.list(), ['v1.0'] )
+            self.assertEquals( treestore.listPackages(), ['v1.0'] )
 
             # Verify it
             treestore.verify( pkg )
@@ -344,7 +379,7 @@ class TestTreeStore(unittest.TestCase):
             self.assertEquals( len(result.diffs), 0 )
 
             # Now create a pre-signed version of the package
-            pkg = treestore.find( 'v1.0' )
+            pkg = treestore.findPackage( 'v1.0' )
             treestore.addUrls( pkg, 3600 )
             self.assertEquals( len(result.missing), 0 )
             self.assertEquals( len(result.extra), 0 )
@@ -367,7 +402,7 @@ class TestTreeStore(unittest.TestCase):
 
             # Rename the tree, and check that installing that is the same
             treestore.rename( 'v1.0', 'v1.0x' )
-            pkg = treestore.find( 'v1.0x' )
+            pkg = treestore.findPackage( 'v1.0x' )
             treestore.download( pkg, CaptureDownloadProgress() )
             destTree = os.path.join( self.workdir, 'dest-3' )
             treestore.install( pkg, destTree, CaptureInstallProgress() )
@@ -398,8 +433,8 @@ class TestTreeStore(unittest.TestCase):
             creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
             treestore1.upload( 'release', '', creationTime, self.srcTree, CaptureUploadProgress() )
             treestore2.upload( 'release', '', creationTime, self.srcTree2, CaptureUploadProgress() )
-            pkg1 = treestore1.find( 'release' )
-            pkg2 = treestore2.find( 'release' )
+            pkg1 = treestore1.findPackage( 'release' )
+            pkg2 = treestore2.findPackage( 'release' )
             self.assertEquals(len(pkg1.files),3)
             self.assertEquals(len(pkg2.files),4)
 
@@ -424,7 +459,7 @@ class TestTreeStore(unittest.TestCase):
             treestore.upload( 'src2', '', creationTime, self.srcTree2, CaptureUploadProgress() )
             treestore.upload( 'src3', '', creationTime, self.srcTree3, CaptureUploadProgress() )
             treestore.createMerged( 'merged', creationTime, { '.' : 'src1', 'subdir-a' : 'src2', 'subdir-b' : 'src3'})
-            pkg = treestore.find( 'merged' )
+            pkg = treestore.findPackage( 'merged' )
             treestore.download( pkg, CaptureDownloadProgress() )
             destTree = os.path.join( self.workdir, 'merged' )
             treestore.install( pkg, destTree, CaptureInstallProgress() )
@@ -459,10 +494,10 @@ class TestTreeStore(unittest.TestCase):
             # Upload it as a tree
             creationTime = datetimeFromIso( '2015-01-01T00:00:00.0' )
             treestore.uploadMany( 'v1.0', '', creationTime, self.srcTree, self.srcVariant, CaptureUploadProgress() )
-            pkg = treestore.find( 'v1.0:kiosk-01' )
+            pkg = treestore.findPackage( 'v1.0:kiosk-01' )
 
             # Confirm it's in the index
-            self.assertEquals( treestore.list(), ['v1.0:kiosk-01', 'v1.0:kiosk-02'] )
+            self.assertEquals( treestore.listPackages(), ['v1.0:kiosk-01', 'v1.0:kiosk-02'] )
 
             # Verify it
             treestore.verify( pkg )

@@ -88,7 +88,9 @@ def init( chunksize ):
 
 def list():
     treeStore = openTreeStore()
-    for treeName in treeStore.list():
+    for treeName in treeStore.listPackages():
+        print treeName
+    for treeName in treeStore.listMetaPackages():
         print treeName
 
 def remove( treename, confirmed ):
@@ -108,13 +110,28 @@ def rename( fromtreename, totreename ):
 
 def info( treename ):
     treeStore = openTreeStore()
-    pkg = treeStore.find( treename )
-    print 'Package:', treename
+    try:
+        pkg = treeStore.findMetaPackage(treename)
+        infofn = printMetaPackageInfo
+    except KeyError:
+        pkg = treeStore.findPackage(treename)
+        infofn = printPackageInfo
+    infofn(treename, pkg)
+
+def printPackageInfo(name, pkg):
+    print 'Package:', name
     print 'Created At:', pkg.creationTime.isoformat()
     print 'Total Size: {0} bytes'.format(pkg.size())
     print 'Files:'
     for pf in pkg.files:
         print '    {0} ({1} chunks, {2} bytes)'.format( pf.path, len(pf.chunks), pf.size() )
+
+def printMetaPackageInfo(name, pkg):
+    print 'Package:', name
+    print 'Created At:', pkg.creationTime.isoformat()
+    print 'Components:'
+    for component in pkg.components:
+        print '    ', component.info()
 
 def upload( treename, description, localdir, dryRun, verbose ):
     creationTime = datetime.datetime.now()
@@ -148,9 +165,9 @@ def createMerged( treename, packageArgs, dryRun, verbose ):
     treeStore.createMerged( treename, creationTime, packageMap)
     print                
 
-def download( treename, dryRun, verbose ):
+def download( treename, dryRun, verbose, metadata ):
     treeStore = openTreeStore(dryRun=dryRun,verbose=verbose)
-    pkg = treeStore.find( treename )
+    pkg = treeStore.find( treename, metadata )
     treeStore.download( pkg, DownloadProgress(pkg) )
     print
 
@@ -164,18 +181,18 @@ def flushCache( dryRun, verbose, packageNames ):
     treeStore.flushLocalCache(packageNames)
     print
     
-def install( treename, localdir, verbose ):
+def install( treename, localdir, verbose, metadata ):
     treeStore = openTreeStore(verbose=verbose)
-    pkg = treeStore.find( treename )
+    pkg = treeStore.find( treename, metadata )
     treeStore.download( pkg, DownloadProgress(pkg) )
     print
     treeStore.verifyLocal( pkg )
     treeStore.install( pkg, localdir, InstallProgress(pkg) )
     print
 
-def verifyInstall( treename, localdir, verbose ):
+def verifyInstall( treename, localdir, verbose, metadata ):
     treeStore = openTreeStore(verbose=verbose)
-    pkg = treeStore.find( treename )
+    pkg = treeStore.find( treename, metadata )
     result = treeStore.compareInstall( pkg, localdir )
     for path in result.missing:
         print "{} is missing".format(path)
@@ -186,9 +203,9 @@ def verifyInstall( treename, localdir, verbose ):
     else:
         sys.exit(1)
 
-def presign( treename, expirySecs ):
+def presign( treename, expirySecs, metadata ):
     treeStore = openTreeStore()
-    pkg = treeStore.find( treename )
+    pkg = treeStore.find( treename, metadata )
     treeStore.addUrls( pkg, expirySecs )
     print json.dumps( PackageJS().toJson(pkg), sort_keys=True, indent=2, separators=(',', ': ') )
 
@@ -213,12 +230,12 @@ def validateCache():
     treeStore = openTreeStore()
     print treeStore.validateLocalCache()
 
-def comparePackages( packageName1, packageName2 ):
+def comparePackages( packageName1, packageName2, metadata ):
     treeStore = openTreeStore()
     print "Fetching {}...".format(packageName1)
-    package1 = treeStore.find(packageName1)
+    package1 = treeStore.find(packageName1, metadata)
     print "Fetching {}...".format(packageName2)
-    package2 = treeStore.find(packageName2)
+    package2 = treeStore.find(packageName2, metadata)
     print "---"
 
     size1 = 0
@@ -241,6 +258,18 @@ def comparePackages( packageName1, packageName2 ):
     print "{} size = {:,}".format(package1.name,size1)
     print "{} size = {:,}".format(package2.name,size2)
     print "update size = {:,}".format(diffSize)
+
+    
+def metaDataDictionary(vals):
+    """
+    Turn list of colon separated pairs (from the command line) into a
+    dictionary
+    """
+    if vals == None:
+        return {}
+    else:
+        # 
+        return dict( [v.split(":",1) for v in vals] )
 
 parser = argparse.ArgumentParser()
 
@@ -275,6 +304,7 @@ p = subparsers.add_parser('download', help='Download a tree to the local cache')
 p.set_defaults(dryRun=False,verbose=False)
 p.add_argument('--dry-run', dest='dryRun', action='store_true')
 p.add_argument('--verbose', dest='verbose', action='store_true')
+p.add_argument('--meta', dest='meta', action='append')
 p.add_argument('treename', action='store', help='The name of the tree')
 
 p = subparsers.add_parser('flush', help='Flush chunks from the store that are no longer referenced')
@@ -291,11 +321,13 @@ p.add_argument('packagenames', nargs='+' )
 p = subparsers.add_parser('install', help='Download/Install a tree into the filesystem')
 p.set_defaults(verbose=False)
 p.add_argument('--verbose', dest='verbose', action='store_true')
+p.add_argument('--meta', dest='meta', action='append')
 p.add_argument('treename', action='store', help='The name of the tree')
 p.add_argument('localdir', action='store', help='The local directory path')
 
 p = subparsers.add_parser('verify-install', help='Confirm a tree has been correctly installed')
 p.add_argument('--verbose', dest='verbose', action='store_true')
+p.add_argument('--meta', dest='meta', action='append')
 p.add_argument('treename', action='store', help='The name of the tree')
 p.add_argument('localdir', action='store', help='The local directory path')
 
@@ -303,6 +335,7 @@ p = subparsers.add_parser('presign', help='Generate a package definition contain
 p.add_argument('treename', action='store', help='The name of the tree')
 p.add_argument('--expirySecs', action='store', default=3600, type=int,
                             help='Validity of the presigned URLs in seconds')
+p.add_argument('--meta', dest='meta', action='append')
 
 p = subparsers.add_parser('download-http', help='Download a tree to the local cache using a presigned package file')
 p.add_argument('pkgfile', action='store', help='The file containing the package definition')
@@ -329,6 +362,7 @@ p.add_argument('treename', action='store', help='The name of the merged tree')
 p.add_argument('package_args', nargs='+', metavar='DIR:RNAME')
 
 p = subparsers.add_parser('compare-packages', help='Compare two packages')
+p.add_argument('--meta', dest='meta', action='append')
 p.add_argument('package1', action='store', help='The first package')
 p.add_argument('package2', action='store', help='The second package')
 
@@ -349,17 +383,17 @@ def main():
     elif args.commandName == 'upload':
         upload( args.treename, args.description, args.localdir, args.dryRun, args.verbose )
     elif args.commandName == 'download':
-        download( args.treename, args.dryRun, args.verbose )
+        download( args.treename, args.dryRun, args.verbose, metaDataDictionary(args.meta) )
     elif args.commandName == 'flush':
         flush( args.dryRun, args.verbose )
     elif args.commandName == 'flush-cache':
         flushCache( args.dryRun, args.verbose, args.packagenames )
     elif args.commandName == 'install':
-        install( args.treename, args.localdir, args.verbose )
+        install( args.treename, args.localdir, args.verbose, metaDataDictionary(args.meta) )
     elif args.commandName == 'verify-install':
-        verifyInstall( args.treename, args.localdir, args.verbose )
+        verifyInstall( args.treename, args.localdir, args.verbose, metaDataDictionary(args.meta) )
     elif args.commandName == 'presign':
-        presign( args.treename, args.expirySecs )
+        presign( args.treename, args.expirySecs, metaDataDictionary(args.meta) )
     elif args.commandName == 'download-http':
         downloadHttp( args.pkgfile )
     elif args.commandName == 'install-http':
@@ -373,7 +407,7 @@ def main():
     elif args.commandName == 'validate-local-cache':
         validateCache()
     elif args.commandName == 'compare-packages':
-        comparePackages(args.package1, args.package2)
+        comparePackages(args.package1, args.package2, metaDataDictionary(args.meta))
 
 if __name__ == '__main__':
     main()

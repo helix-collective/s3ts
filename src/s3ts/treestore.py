@@ -1,11 +1,12 @@
 import os, hashlib, zlib, tempfile, datetime, time, shutil
 import requests
-
+            
 from s3ts.config import TreeStoreConfig, TreeStoreConfigJS, InstallProperties, writeInstallProperties, S3TS_PROPERTIES
-from s3ts import package, filewriter, utils
+from s3ts import package, filewriter, utils, metapackage
 
 CONFIG_PATH = 'config'
 TREES_PATH = 'trees'
+META_TREES_PATH = 'meta'
 CHUNKS_PATH = 'chunks'
 RAW_PATH = 'raw'
 ZLIB_PATH = 'zlib'
@@ -75,6 +76,11 @@ class TreeStore(object):
             self.pkgStore.putToJson( self.__treeNamePath( self.pkgStore, treeName ), pkg, package.PackageJS() )
         return pkg
 
+    def uploadMetaPackage(self, meta):
+        """ Upload a meta package to the store.
+        """
+        self.pkgStore.putToJson( self.__metaTreeNamePath( self.pkgStore, meta.name ), meta, metapackage.MetaPackageJS() )
+
     def uploadMany( self, treeName, description, creationTime, commonLocalPath, variantsLocalPath, progressCB ):
         """Creates multiple package for the content of commonPath including variantsLocalPath files
         for each directory found in the variantsLocalPath.
@@ -104,7 +110,7 @@ class TreeStore(object):
         description = "merged package:"
         
         for subdir,subTreeName in packageMap.items():
-            subpackage = self.find( subTreeName )
+            subpackage = self.findPackage( subTreeName )
             for file in subpackage.files:
                 path = package.pathFromFileSystem( os.path.normpath( os.path.join(subdir, file.path) ) )
                 files.append( package.PackageFile( file.sha1, path, file.chunks ) )
@@ -116,13 +122,33 @@ class TreeStore(object):
             self.pkgStore.putToJson( self.__treeNamePath( self.pkgStore, treeName ), pkg, package.PackageJS() )
         return pkg
         
-    def find( self, treeName ):
+    def find( self, treeName, metadata ):
+        """
+        Return the package definition for the given name.
+
+        Metapackages will be detected, and the equivalent
+        regular package will be returned.
+        """
+        try:
+            return self.findMetaPackage(treeName).package(self, metadata)
+        except KeyError:
+            return self.findPackage(treeName)
+
+    def findPackage( self, treeName ):
         """Return the package definition for the given name"""
         return self.pkgStore.getFromJson( self.__treeNamePath( self.pkgStore, treeName ), package.PackageJS() )
 
-    def list( self ):
+    def findMetaPackage( self, metaTreeName ):
+        """Return the meta package definition for the given name"""
+        return self.pkgStore.getFromJson( self.__metaTreeNamePath( self.pkgStore, metaTreeName ), metapackage.MetaPackageJS() )
+
+    def listPackages( self ):
         """Returns the available packages names"""
         return self.pkgStore.list( TREES_PATH )
+
+    def listMetaPackages( self ):
+        """Returns the available meta packages names"""
+        return self.pkgStore.list( META_TREES_PATH )
 
     def remove( self, treeName ):
         """Removes a tree from the store"""
@@ -342,7 +368,7 @@ class TreeStore(object):
         Remove all chunks from the local cache that are not
         referenced by the named packages. Returns the chunks removed.
         """
-        packages = [ self.find(pname) for pname in packageNames]
+        packages = [ self.findPackage(pname) for pname in packageNames]
         if len(packages) == 0:
             raise RuntimeError, "flushLocalCache refuses to remove all cached chunks"
         return self.__flushStore( self.localCache, packages )
@@ -353,7 +379,7 @@ class TreeStore(object):
         This will happen when packages are deleted Returns the chunks removed.
         """
         packageNames = self.pkgStore.list(TREES_PATH)
-        packages = [ self.find(packageName) for packageName in packageNames ]
+        packages = [ self.findPackage(packageName) for packageName in packageNames ]
         return self.__flushStore( self.pkgStore, packages )
 
     def __validateStore( self, fileStore ):
@@ -457,6 +483,9 @@ class TreeStore(object):
 
     def __treeNamePath( self, store, treeName ):
         return store.joinPath( TREES_PATH, treeName )
+
+    def __metaTreeNamePath( self, store, metaTreeName ):
+        return store.joinPath( META_TREES_PATH, metaTreeName )
 
     def __chunkPath( self, store, sha1, encoding ):
         enc = {
