@@ -6,6 +6,7 @@ from s3ts.treestore import TreeStore, TreeStoreConfig
 from s3ts.filestore import FileStore, LocalFileStore
 from s3ts.s3filestore import S3FileStore
 from s3ts.package import PackageJS, packageDiff
+from s3ts.metapackage import MetaPackage, SubPackage, MetaPackageJS
 
 def getEnv( name, desc ):
     try:
@@ -259,6 +260,38 @@ def comparePackages( packageName1, packageName2, metadata ):
     print "{} size = {:,}".format(package2.name,size2)
     print "update size = {:,}".format(diffSize)
 
+TEMPLATE_METAPACKAGE_NAME =  "METANAME-VERSION"
+
+def newMetaPackage(metapackagefile):
+    template = MetaPackage(
+      name = TEMPLATE_METAPACKAGE_NAME,
+      description = "",
+      creationTime = datetime.datetime.now(),
+      components = [
+        SubPackage("SUBDIR1", "PACKAGE1-VERSION"),
+        SubPackage("SUBDIR2", "PACKAGE2-VERSION")
+      ]
+    )
+    with open(metapackagefile, 'w') as f:
+        f.write(json.dumps(MetaPackageJS().toJson(template), indent=2))
+        f.write('\n')
+    print "metapackage template written to {}".format(metapackagefile)
+
+def uploadMetaPackage(metapackagefile):
+    treeStore = openTreeStore()
+    with open(metapackagefile, 'r') as f:
+        metapackage = MetaPackageJS().fromJson(json.load(f))
+    if metapackage.name == TEMPLATE_METAPACKAGE_NAME:
+        raise RuntimeError, "Edit the metapackage template before uploading it"
+    metapackage.verify(treeStore,{})
+    treeStore.uploadMetaPackage(metapackage)
+
+def downloadMetaPackage(metapackagename,metapackagefile):
+    treeStore = openTreeStore()
+    metapackage = treeStore.findMetaPackage(metapackagename)
+    with open(metapackagefile, 'w') as f:
+        f.write(json.dumps(MetaPackageJS().toJson(metapackage), indent=2))
+        f.write('\n')
     
 def metaDataDictionary(vals):
     """
@@ -361,6 +394,16 @@ p.add_argument('--verbose', dest='verbose', action='store_true')
 p.add_argument('treename', action='store', help='The name of the merged tree')
 p.add_argument('package_args', nargs='+', metavar='DIR:RNAME')
 
+p = subparsers.add_parser('new-metapackage', help='Write a template for a metapackage to a local file')
+p.add_argument('metapackagefile', action='store', help='The metapackage file to which the template is to be written')
+
+p = subparsers.add_parser('upload-metapackage', help='Upload a metapackage from a local file')
+p.add_argument('metapackagefile', action='store', help='The metapackage file to be uploaded')
+
+p = subparsers.add_parser('download-metapackage', help='Download an existing metapackage to a local file')
+p.add_argument('metapackagename', action='store', help='The name of the metapackage to be downloaded')
+p.add_argument('metapackagefile', action='store', help='The metapackage file to be uploaded')
+
 p = subparsers.add_parser('compare-packages', help='Compare two packages')
 p.add_argument('--meta', dest='meta', action='append')
 p.add_argument('package1', action='store', help='The first package')
@@ -408,6 +451,12 @@ def main():
         validateCache()
     elif args.commandName == 'compare-packages':
         comparePackages(args.package1, args.package2, metaDataDictionary(args.meta))
+    elif args.commandName == 'new-metapackage':
+        newMetaPackage(args.metapackagefile)
+    elif args.commandName == 'upload-metapackage':
+        uploadMetaPackage(args.metapackagefile)
+    elif args.commandName == 'download-metapackage':
+        downloadMetaPackage(args.metapackagename, args.metapackagefile)
 
 if __name__ == '__main__':
     main()
