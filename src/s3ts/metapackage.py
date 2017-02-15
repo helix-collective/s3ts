@@ -17,6 +17,7 @@ class MetaPackage(object):
         self.components = components
 
     def verify(self, treestore, metadata):
+        assert self.name
         for component in self.components:
             component.verify(treestore, metadata)
 
@@ -35,6 +36,8 @@ class SubPackage(object):
         self.packageName = packageName
 
     def verify(self, treestore, metadata):
+        assert self.installPath
+        assert self.packageName
         try:
             treestore.findPackage(self.packageName)
         except KeyError:
@@ -63,6 +66,9 @@ class LocalizedPackage(object):
         self.defaultPackageName = defaultPackageName
 
     def verify(self, treestore, metadata):
+        assert self.installPath
+        assert self.localizedPackageName
+        assert self.defaultPackageName
         metakeys = re.re.findall( '{([^}]*)}', self.localizedPackageName)
         for key in metakeys:
             if not metadata.has_key(key):
