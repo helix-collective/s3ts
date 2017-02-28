@@ -88,7 +88,7 @@ class LocalizedPackage(object):
         return packageFilesInSubdir(self.installPath, subpackage)
 
     def info(self):
-        return '{}: package {}'.format( installPath, self.localizedPackageName )
+        return '{} -> package {}'.format(self.installPath, self.localizedPackageName)
 
 # In the json serialization code below we use OrderedDict
 # to lock down the order of the fields in the generated json.
