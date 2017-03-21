@@ -88,6 +88,23 @@ class FileChunkJS(object):
     def fromJson( self, jv ):
         return FileChunk( jv['sha1'], jv['size'], jv['encoding'], jv.get('url') )
 
+def packageFilter(package, pathRegex ):
+    """
+    Return a new package that only includes paths from the
+    input package that match the given regexp
+
+    """
+    result = Package(
+        name=package.name,
+        description=package.description,
+        creationTime=package.creationTime,
+        files=[]
+    )
+    for file in package.files:
+        if not pathRegex or pathRegex.match(file.path):
+            result.files.append(file)
+    return result
+
 def pathFromFileSystem(fspath):
     """
     Turn a local filesystem path into a package file path.
