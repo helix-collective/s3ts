@@ -1,11 +1,11 @@
-import os, sys, argparse, json, datetime
+import os, sys, argparse, json, datetime, re
 
 import boto
 
 from s3ts.treestore import TreeStore, TreeStoreConfig
 from s3ts.filestore import FileStore, LocalFileStore
 from s3ts.s3filestore import S3FileStore
-from s3ts.package import PackageJS, packageDiff
+from s3ts.package import PackageJS, packageDiff, packageFilter
 from s3ts.metapackage import MetaPackage, SubPackage, MetaPackageJS
 
 def getEnv( name, desc ):
@@ -109,13 +109,14 @@ def rename( fromtreename, totreename ):
     treestore = openTreeStore()
     treestore.rename( fromtreename, totreename )
 
-def info( treename ):
+def info( treename, pathRegex ):
     treeStore = openTreeStore()
     try:
         pkg = treeStore.findMetaPackage(treename)
         infofn = printMetaPackageInfo
     except KeyError:
         pkg = treeStore.findPackage(treename)
+        pkg = packageFilter(pkg,pathRegex)
         infofn = printPackageInfo
     infofn(treename, pkg)
 
@@ -182,9 +183,10 @@ def flushCache( dryRun, verbose, packageNames ):
     treeStore.flushLocalCache(packageNames)
     print
     
-def install( treename, localdir, verbose, metadata ):
+def install( treename, localdir, verbose, pathRegex, metadata ):
     treeStore = openTreeStore(verbose=verbose)
     pkg = treeStore.find( treename, metadata )
+    pkg = packageFilter(pkg,pathRegex)
     treeStore.download( pkg, DownloadProgress(pkg) )
     print
     treeStore.verifyLocal( pkg )
@@ -304,6 +306,12 @@ def metaDataDictionary(vals):
         # 
         return dict( [v.split(":",1) for v in vals] )
 
+def pathRegex(arg):
+    if arg == None:
+        return None
+    else:
+        return re.compile(arg)
+
 parser = argparse.ArgumentParser()
 
 subparsers = parser.add_subparsers(help='commands',dest='commandName')
@@ -324,6 +332,7 @@ p.add_argument('totreename', action='store', help='The name of the target tree')
 
 p = subparsers.add_parser('info', help='Show information about a tree')
 p.add_argument('treename', action='store', help='The name of the tree')
+p.add_argument('--path-regex', dest='pathRegex', action='store')
 
 p = subparsers.add_parser('upload', help='Upload a tree from the local filesystem')
 p.set_defaults(dryRun=False,verbose=False,description='')
@@ -355,6 +364,7 @@ p = subparsers.add_parser('install', help='Download/Install a tree into the file
 p.set_defaults(verbose=False)
 p.add_argument('--verbose', dest='verbose', action='store_true')
 p.add_argument('--meta', dest='meta', action='append')
+p.add_argument('--path-regex', dest='pathRegex', action='store')
 p.add_argument('treename', action='store', help='The name of the tree')
 p.add_argument('localdir', action='store', help='The local directory path')
 
@@ -422,7 +432,7 @@ def main():
     elif args.commandName == 'rename':
         rename( args.fromtreename, args.totreename )
     elif args.commandName == 'info':
-        info( args.treename )
+        info( args.treename, pathRegex(args.pathRegex) )
     elif args.commandName == 'upload':
         upload( args.treename, args.description, args.localdir, args.dryRun, args.verbose )
     elif args.commandName == 'download':
@@ -432,7 +442,7 @@ def main():
     elif args.commandName == 'flush-cache':
         flushCache( args.dryRun, args.verbose, args.packagenames )
     elif args.commandName == 'install':
-        install( args.treename, args.localdir, args.verbose, metaDataDictionary(args.meta) )
+        install( args.treename, args.localdir, args.verbose, pathRegex(args.pathRegex), metaDataDictionary(args.meta) )
     elif args.commandName == 'verify-install':
         verifyInstall( args.treename, args.localdir, args.verbose, metaDataDictionary(args.meta) )
     elif args.commandName == 'presign':
