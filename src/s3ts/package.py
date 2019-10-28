@@ -1,5 +1,6 @@
 import json, datetime
 
+from collections import OrderedDict
 from s3ts.utils import datetimeFromIso
 
 ENCODING_RAW = 'raw'
@@ -47,11 +48,11 @@ class PackageJS(object):
         )
                         
     def toJson( self, v ):
-        return {
-            'name' : v.name,
-            'creationTime' : v.creationTime.isoformat(),
-            'files' : [ self.packageFileJS.toJson(f) for f in v.files ],
-        }
+        return OrderedDict([
+            ('name', v.name),
+            ('creationTime', v.creationTime.isoformat()),
+            ('files', [ self.packageFileJS.toJson(f) for f in v.files ]),
+        ])
 
 class PackageFileJS(object):
     "A json de/serialiser for PackageFile objects"
@@ -59,11 +60,11 @@ class PackageFileJS(object):
         self.chunkJS = FileChunkJS()
 
     def toJson( self, v ):
-        return {
-            'sha1' : v.sha1,
-            'path' : v.path,
-            'chunks' : [ self.chunkJS.toJson(v) for v in v.chunks ]
-        }
+        return OrderedDict([
+            ('path', v.path),
+            ('sha1', v.sha1),
+            ('chunks', [ self.chunkJS.toJson(v) for v in v.chunks ]),
+        ])
 
     def fromJson( self, jv ):
         return PackageFile( jv['sha1'], jv['path'], [self.chunkJS.fromJson(jv1) for jv1 in jv['chunks']] )
@@ -73,11 +74,11 @@ class FileChunkJS(object):
     "A json de/serialiser for FileChunk objects"
 
     def toJson( self, v ):
-        jv = {
-            'sha1' : v.sha1,
-            'size' : v.size,
-            'encoding' : v.encoding
-        }
+        jv = OrderedDict([ 
+            ('sha1', v.sha1),
+            ('size', v.size),
+            ('encoding', v.encoding),
+        ])
         if v.url != None:
             jv['url'] = v.url
         return jv
