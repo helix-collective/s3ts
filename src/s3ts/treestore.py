@@ -443,6 +443,8 @@ class TreeStore(object):
         for root, dirs, files in os.walk(localPath):
             for file in files:
                 rpath = os.path.relpath( os.path.join(root, file), localPath )
+                if rpath == S3TS_PROPERTIES:
+                  continue
                 packageFiles.append( self.__storeFile( store, localPath, rpath, progressCB ) )
         return packageFiles
 
