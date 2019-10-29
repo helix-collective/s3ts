@@ -228,7 +228,8 @@ class TreeStore(object):
             for file in files:
                 installedFiles.append(os.path.relpath( os.path.join(root, file), localPath ))
         installedFiles = set(installedFiles)
-        installedFiles.remove( S3TS_PROPERTIES )
+        if S3TS_PROPERTIES in installedFiles:
+            installedFiles.remove( S3TS_PROPERTIES )
 
         packageFiles = [f.path for f in pkg.files]
         packageFiles = set(packageFiles)
@@ -357,6 +358,8 @@ class TreeStore(object):
         for root, dirs, files in os.walk(localPath):
             for file in files:
                 rpath = os.path.relpath( os.path.join(root, file), localPath )
+                if rpath == S3TS_PROPERTIES:
+                  continue
                 packageFiles.append( self.__storeFile( store, localPath, rpath, progressCB ) )
         return packageFiles
 

@@ -51,10 +51,11 @@ def outVerbose( formatStr, *args ):
     sys.stdout.write( "\r" + formatStr.format(*args) + "\n" )
     sys.stdout.flush()
 
-def connectToBucket():
-    awsAccessKeyId = getEnv( 'AWS_ACCESS_KEY_ID', 'the AWS access key id' )
-    awsSecretAccessKey = getEnv( 'AWS_SECRET_ACCESS_KEY', 'the AWS secret access key' )
-    bucketName = getEnv( 'S3TS_BUCKET', 'the AWS S3 bucket used for tree storage'  )
+def connectToBucket(bucketName=None,s3PathPrefix=None):
+    awsAccessKeyId = getEnv( 'AWS_ACCESS_KEY_ID', 'the AWS access key id for access to {}'.format(bucketName) )
+    awsSecretAccessKey = getEnv( 'AWS_SECRET_ACCESS_KEY', 'the AWS secret access key for access to {}'.format(bucketName) )
+    bucketName = bucketName or getEnv( 'S3TS_BUCKET', 'the AWS S3 bucket used for tree storage'  )
+    s3PathPrefix = s3PathPrefix or os.environ.get( 'S3TS_S3PREFIX' )
     s3c = boto.connect_s3(awsAccessKeyId,awsSecretAccessKey)
     return s3c.get_bucket( bucketName )
 
@@ -172,16 +173,24 @@ def installReadingPfile( packagefile, localdir, verbose ):
     treeStore.install( pkg, localdir, InstallProgress(pkg) )
     print
 
+def verifyInstallPfile( packagefile, localdir, verbose ):
+    treeStore = openTreeStore(verbose=verbose)
+    pkg = readPackageFile(packagefile)
+    _verifyPackage(packagefile, pkg, localdir)
+
 def verifyInstall( treename, localdir, verbose ):
     treeStore = openTreeStore(verbose=verbose)
     pkg = treeStore.find( treename )
+    _verifyPackage(treename, pkg, localdir)
+
+def _verifyPackage(name, pkg, localdir):
     result = treeStore.compareInstall( pkg, localdir )
     for path in result.missing:
         print "{} is missing".format(path)
     for path in result.diffs:
         print "{} is different".format(path)
     if len(result.missing) == 0 and len(result.diffs) == 0:
-        print "Package {} verified ok at {}".format(treename,localdir)
+        print "Package {} verified ok at {}".format(name,localdir)
     else:
         sys.exit(1)
 
@@ -301,6 +310,11 @@ p.add_argument('--verbose', dest='verbose', action='store_true')
 p.add_argument('packagefile', action='store', help='The filepath to which the package is written')
 p.add_argument('localdir', action='store', help='The local directory path')
 
+p = subparsers.add_parser('verify-install-pfile', help='Confirm a package file has been correctly installed')
+p.add_argument('--verbose', dest='verbose', action='store_true')
+p.add_argument('packagefile', action='store', help='The package filepath')
+p.add_argument('localdir', action='store', help='The local directory path')
+
 
 validate_local_cache_parser = subparsers.add_parser('validate-local-cache', help='Validates the local cache')
 
@@ -344,6 +358,8 @@ def main():
         uploadWritingPfile(args.packagefile, args.localdir, args.dryRun, args.verbose )
     elif args.commandName == 'install-reading-pfile':
         installReadingPfile(args.packagefile, args.localdir, args.verbose )
+    elif args.commandName == 'verify-pfile':
+        verifyInstallPfile(args.packagefile, args.localdir, args.verbose )
 
 if __name__ == '__main__':
     main()
