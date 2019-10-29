@@ -84,6 +84,10 @@ def readPackageFile( packageFile ):
     with open( packageFile, 'r' ) as f:
         return PackageJS().fromJson( json.loads( f.read() ) )
 
+def writePackageFile( packageFile, pkg ):
+    with open( packageFile, 'w' ) as f:
+        f.write(json.dumps(PackageJS().toJson(pkg),indent=2))
+
 def init( chunksize ):
     treeStore = createTreeStore(chunksize)
 
@@ -141,11 +145,18 @@ def upload( treename, description, localdir, dryRun, verbose ):
     treeStore.upload( treename, description, creationTime, localdir, UploadProgress() )
     print
 
+def uploadWritingPfile(packagefile, localdir, dryRun, verbose):
+    creationTime = datetime.datetime.now()
+    treeStore = openTreeStore(dryRun=dryRun,verbose=verbose)
+    treename = 'upload-' + creationTime.isoformat()
+    pkg = treeStore.upload( treename, creationTime, localdir, UploadProgress() )
+    writePackageFile(packagefile, pkg)
+
 def uploadMany( treename, description, localdir, kioskDir ):
     creationTime = datetime.datetime.now()
     treeStore = openTreeStore()
     treeStore.uploadMany(treename, description, creationTime, localdir, kioskDir, UploadProgress())
-    print
+    print()
 
 def createMerged( treename, packageArgs, dryRun, verbose ):
     creationTime = datetime.datetime.now()
@@ -187,6 +198,15 @@ def install( treename, localdir, verbose, pathRegex, metadata ):
     treeStore = openTreeStore(verbose=verbose)
     pkg = treeStore.find( treename, metadata )
     pkg = packageFilter(pkg,pathRegex)
+    treeStore.download( pkg, DownloadProgress(pkg) )
+    print
+    treeStore.verifyLocal( pkg )
+    treeStore.install( pkg, localdir, InstallProgress(pkg) )
+    print
+
+def installReadingPfile( packagefile, localdir, verbose ):
+    treeStore = openTreeStore(verbose=verbose)
+    pkg = readPackageFile(packagefile)
     treeStore.download( pkg, DownloadProgress(pkg) )
     print
     treeStore.verifyLocal( pkg )
@@ -419,6 +439,20 @@ p.add_argument('--meta', dest='meta', action='append')
 p.add_argument('package1', action='store', help='The first package')
 p.add_argument('package2', action='store', help='The second package')
 
+p = subparsers.add_parser('install-reading-pfile', help='Download/Install into the filesystem, using a local package file')
+p.set_defaults(verbose=False)
+p.add_argument('--verbose', dest='verbose', action='store_true')
+p.add_argument('packagefile', action='store', help='The filepath from which the package is read')
+p.add_argument('localdir', action='store', help='The local directory path')
+
+p = subparsers.add_parser('upload-writing-pfile', help='Upload files from the local filesystem, writing the package to a local file')
+p.set_defaults(dryRun=False,verbose=False)
+p.add_argument('--dry-run', dest='dryRun', action='store_true')
+p.add_argument('--verbose', dest='verbose', action='store_true')
+p.add_argument('packagefile', action='store', help='The filepath to which the package is written')
+p.add_argument('localdir', action='store', help='The local directory path')
+
+
 validate_local_cache_parser = subparsers.add_parser('validate-local-cache', help='Validates the local cache')
 
 def main():
@@ -467,6 +501,10 @@ def main():
         uploadMetaPackage(args.metapackagefile)
     elif args.commandName == 'download-metapackage':
         downloadMetaPackage(args.metapackagename, args.metapackagefile)
+    elif args.commandName == 'upload-writing-pfile':
+        uploadWritingPfile(args.packagefile, args.localdir, args.dryRun, args.verbose )
+    elif args.commandName == 'install-reading-pfile':
+        installReadingPfile(args.packagefile, args.localdir, args.verbose )
 
 if __name__ == '__main__':
     main()
