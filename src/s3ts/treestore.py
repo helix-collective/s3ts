@@ -25,7 +25,7 @@ class TreeStore(object):
         """creates a new treestore"""
         try:
             pkgStore.get( CONFIG_PATH )
-            raise RuntimeError, "treestore is already initialised"
+            raise RuntimeError("treestore is already initialised")
         except KeyError:
             pkgStore.putToJson( CONFIG_PATH, config, TreeStoreConfigJS() )
             return cls( pkgStore, localCache, config )
@@ -292,7 +292,7 @@ class TreeStore(object):
                     progressCB( len(buf) )
 
             if filesha1.hexdigest() != pf.sha1:
-                raise RuntimeError, "sha1 for {0} doesn't match".format(pf.path)
+                raise RuntimeError("sha1 for {0} doesn't match".format(pf.path))
 
             self.outVerbose( "Wrote {}", targetPath )
 
@@ -370,7 +370,7 @@ class TreeStore(object):
         """
         packages = [ self.findPackage(pname) for pname in packageNames]
         if len(packages) == 0:
-            raise RuntimeError, "flushLocalCache refuses to remove all cached chunks"
+            raise RuntimeError("flushLocalCache refuses to remove all cached chunks")
         return self.__flushStore( self.localCache, packages )
 
     def flushStore(self):
@@ -406,7 +406,7 @@ class TreeStore(object):
             for chunk in pf.chunks:
                 cpath = self.__chunkPath( fileStore, chunk.sha1, chunk.encoding )
                 if not fileStore.exists( cpath ):
-                    raise RuntimeError, "{0} not found".format(cpath)
+                    raise RuntimeError("{0} not found".format(cpath))
 
     def __flushStore( self, fileStore, packages ):
         """Remove all keys from the store except those referenced by the given packages"""
@@ -511,4 +511,4 @@ class TreeStore(object):
         csha1 = hashlib.sha1()
         csha1.update( buf )
         if csha1.hexdigest() != sha1:
-            raise RuntimeError, "sha1 for {0} doesn't match".format( cpath )
+            raise RuntimeError("sha1 for {0} doesn't match".format( cpath ))

@@ -41,7 +41,7 @@ class SubPackage(object):
         try:
             treestore.findPackage(self.packageName)
         except KeyError:
-            raise KeyError, "package {} doesn't exist".format(self.packageName)
+            raise KeyError("package {} doesn't exist".format(self.packageName))
 
     def packageFiles(self, treestore, metadata):
         subpackage = treestore.findPackage(self.packageName)
@@ -72,7 +72,7 @@ class LocalizedPackage(object):
         metakeys = re.re.findall( '{([^}]*)}', self.localizedPackageName)
         for key in metakeys:
             if not metadata.has_key(key):
-                raise RuntimeError, "Package references unknown metdata key '{}'".format(key)
+                raise RuntimeError("Package references unknown metdata key '{}'".format(key))
             packageName = self.localizedPackageName.format(**metdata)
             try:
                 treestore.findPackage(self.packageName)
@@ -128,7 +128,7 @@ class ComponentJS(object):
         elif jv.has_key('localizedPackage'):
             return self.localizedPackageJS.fromJson( jv['localizedPackage'] )
         else:
-            raise RuntimeError, "invalid metapackage component"
+            raise RuntimeError("invalid metapackage component")
         
     def toJson( self, v ):
         if isinstance( v, SubPackage ):
@@ -136,7 +136,7 @@ class ComponentJS(object):
         elif isinstance( v, LocalizedPackage ):
             return { 'localizedPackage' : self.localizedPackageJS.toJson(v) }
         else:
-            raise RuntimeError, "invalid metapackage component"
+            raise RuntimeError("invalid metapackage component")
 
 class SubPackageJS(object):
     """A json de/serializer for metapackage SubPackage objects"""
