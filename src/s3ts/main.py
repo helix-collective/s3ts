@@ -90,20 +90,20 @@ def init( chunksize ):
 def list():
     treeStore = openTreeStore()
     for treeName in treeStore.listPackages():
-        print treeName
+        print(treeName)
     for treeName in treeStore.listMetaPackages():
-        print treeName
+        print(treeName)
 
 def remove( treename, confirmed ):
     if not confirmed:
         s = raw_input( "Really remove tree '{}' (Y/N) ? [N] ".format(treename) )
         confirmed = s =='Y'
     if confirmed:
-        print "Removing {}".format( treename )
+        print("Removing {}".format( treename ))
         treestore = openTreeStore()
         treestore.remove( treename )
     else:
-        print "Cancelled"
+        print("Cancelled")
 
 def rename( fromtreename, totreename ):
     treestore = openTreeStore()
@@ -121,19 +121,19 @@ def info( treename, pathRegex ):
     infofn(treename, pkg)
 
 def printPackageInfo(name, pkg):
-    print 'Package:', name
-    print 'Created At:', pkg.creationTime.isoformat()
-    print 'Total Size: {0} bytes'.format(pkg.size())
-    print 'Files:'
+    print('Package:', name)
+    print('Created At:', pkg.creationTime.isoformat())
+    print('Total Size: {0} bytes'.format(pkg.size()))
+    print('Files:')
     for pf in pkg.files:
-        print '    {0} ({1} chunks, {2} bytes)'.format( pf.path, len(pf.chunks), pf.size() )
+        print('    {0} ({1} chunks, {2} bytes)'.format( pf.path, len(pf.chunks), pf.size() ))
 
 def printMetaPackageInfo(name, pkg):
-    print 'Package:', name
-    print 'Created At:', pkg.creationTime.isoformat()
-    print 'Components:'
+    print('Package:', name)
+    print('Created At:', pkg.creationTime.isoformat())
+    print('Components:')
     for component in pkg.components:
-        print '    ', component.info()
+        print('    ', component.info())
 
 def upload( treename, description, localdir, dryRun, verbose ):
     creationTime = datetime.datetime.now()
@@ -165,7 +165,7 @@ def createMerged( treename, packageArgs, dryRun, verbose ):
         packageMap[fields[0]] = fields[1]
     
     treeStore.createMerged( treename, creationTime, packageMap)
-    print                
+    print(               )
 
 def download( treename, dryRun, verbose, metadata ):
     treeStore = openTreeStore(dryRun=dryRun,verbose=verbose)
@@ -198,11 +198,11 @@ def verifyInstall( treename, localdir, verbose, metadata ):
     pkg = treeStore.find( treename, metadata )
     result = treeStore.compareInstall( pkg, localdir )
     for path in result.missing:
-        print "{} is missing".format(path)
+        print("{} is missing".format(path))
     for path in result.diffs:
-        print "{} is different".format(path)
+        print("{} is different".format(path))
     if len(result.missing) == 0 and len(result.diffs) == 0:
-        print "Package {} verified ok at {}".format(treename,localdir)
+        print("Package {} verified ok at {}".format(treename,localdir))
     else:
         sys.exit(1)
 
@@ -210,7 +210,7 @@ def presign( treename, expirySecs, metadata ):
     treeStore = openTreeStore()
     pkg = treeStore.find( treename, metadata )
     treeStore.addUrls( pkg, expirySecs )
-    print json.dumps( PackageJS().toJson(pkg), sort_keys=True, indent=2, separators=(',', ': ') )
+    print(json.dumps( PackageJS().toJson(pkg), sort_keys=True, indent=2, separators=(',', ': ') ))
 
 def downloadHttp( packageFile ):
     treeStore = nonS3TreeStore()
@@ -231,15 +231,15 @@ def primeCache( localdir ):
 
 def validateCache():
     treeStore = openTreeStore()
-    print treeStore.validateLocalCache()
+    print(treeStore.validateLocalCache())
 
 def comparePackages( packageName1, packageName2, metadata ):
     treeStore = openTreeStore()
-    print "Fetching {}...".format(packageName1)
+    print("Fetching {}...".format(packageName1))
     package1 = treeStore.find(packageName1, metadata)
-    print "Fetching {}...".format(packageName2)
+    print("Fetching {}...".format(packageName2))
     package2 = treeStore.find(packageName2, metadata)
-    print "---"
+    print("---")
 
     size1 = 0
     size2 = 0
@@ -251,16 +251,16 @@ def comparePackages( packageName1, packageName2, metadata ):
         size2 += f.size()
     diffPackage,removedPaths = packageDiff(package1,package2)
     for p in removedPaths:
-        print "Removed", p
+        print("Removed", p)
     for f in diffPackage.files:
         size = f.size()
-        print "Updated {} (size {:,})".format(f.path,size)
+        print("Updated {} (size {:,})".format(f.path,size))
         diffSize += size
 
     print
-    print "{} size = {:,}".format(package1.name,size1)
-    print "{} size = {:,}".format(package2.name,size2)
-    print "update size = {:,}".format(diffSize)
+    print("{} size = {:,}".format(package1.name,size1))
+    print("{} size = {:,}".format(package2.name,size2))
+    print("update size = {:,}".format(diffSize))
 
 TEMPLATE_METAPACKAGE_NAME =  "METANAME-VERSION"
 
@@ -277,14 +277,14 @@ def newMetaPackage(metapackagefile):
     with open(metapackagefile, 'w') as f:
         f.write(json.dumps(MetaPackageJS().toJson(template), indent=2))
         f.write('\n')
-    print "metapackage template written to {}".format(metapackagefile)
+    print("metapackage template written to {}".format(metapackagefile))
 
 def uploadMetaPackage(metapackagefile):
     treeStore = openTreeStore()
     with open(metapackagefile, 'r') as f:
         metapackage = MetaPackageJS().fromJson(json.load(f))
     if metapackage.name == TEMPLATE_METAPACKAGE_NAME:
-        raise RuntimeError, "Edit the metapackage template before uploading it"
+        raise RuntimeError("Edit the metapackage template before uploading it")
     metapackage.verify(treeStore,{})
     treeStore.uploadMetaPackage(metapackage)
 

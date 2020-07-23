@@ -18,7 +18,7 @@ class S3FileStore(FileStore):
         k = self._key(path)
         try:
             return k.get_contents_as_string()
-        except S3ResponseError, e:
+        except S3ResponseError as e:
             if e.status == 404:
                 raise KeyError(e)
             raise

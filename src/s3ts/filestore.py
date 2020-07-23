@@ -6,7 +6,7 @@ class FileStore(object):
 
     def exists( self, path ):
         """Returns true if a file with the given file exists"""
-        raise RuntimeError, "Not implemented"
+        raise RuntimeError("Not implemented")
 
     def get( self, path ):
         """Get the value associated with path
@@ -14,23 +14,23 @@ class FileStore(object):
         Raises a KeyError if the path doesn't exist
 
         """
-        raise RuntimeError, "Not implemented"
+        raise RuntimeError("Not implemented")
 
     def put( self, path, body ):
         """Store a value associated with path
 
         Overwrites any existing value
         """
-        raise RuntimeError, "Not implemented"
+        raise RuntimeError("Not implemented")
 
     def remove( self, path ):
         """Remove a value with the path, if it exists
         """
-        raise RuntimeError, "Not implemented"
+        raise RuntimeError("Not implemented")
 
     def list( self, pathPrefix ):
         """Return all paths having the specified path prefix"""
-        raise RuntimeError, "Not implemented"
+        raise RuntimeError("Not implemented")
 
     def getFromJson( self, path, jscoder ):
         return jscoder.fromJson( json.loads( self.get(path) ) )
@@ -39,16 +39,16 @@ class FileStore(object):
         return self.put( path, json.dumps( jscoder.toJson(v) ) )
 
     def url( self, path, expiresInSecs ):
-        raise RuntimeError, "Not implemented"
+        raise RuntimeError("Not implemented")
 
     def joinPath( self, *elements):
-        raise RuntimeError, "Not implemented"
+        raise RuntimeError("Not implemented")
 
     def splitPath( self, path):
-        raise RuntimeError, "Not implemented"
+        raise RuntimeError("Not implemented")
 
     def getMetadata( self, path):
-        raise RuntimeError, "Not implemented"
+        raise RuntimeError("Not implemented")
 
 class FileMetaData:
     def __init__(self,size,lastModified):
@@ -75,7 +75,7 @@ class LocalFileStore(FileStore):
         try:
             with open( self.__path(path), 'rb' ) as f:
                 return f.read()
-        except IOError, e:
+        except IOError as e:
             raise KeyError(e)
 
     def put( self, path, body ):
