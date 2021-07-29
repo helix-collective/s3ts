@@ -51,15 +51,15 @@ class TestTreeStore(unittest.TestCase):
             shutil.rmtree( self.workdir )
         os.makedirs( self.workdir )
 
-        self.FILE1 = '#!/bin/env python\n def main(): print "hello"\n'
-        self.FILE2 = '#!/bin/env python\n def main(): print "goodbye"\n'
-        self.FILE2_A = '#!/bin/env python\n def main(): print "goodbye foreever"\n'
-        self.FILE3 = '#!/bin/env python\n def main(): print "goodbye foreever"\n'
-        self.FILE4 = '#!/bin/env python\n def main(): print "what now"\n' 
-        self.FILE5 = 'Just text' 
+        self.FILE1 = b'#!/bin/env python\n def main(): print "hello"\n'
+        self.FILE2 = b'#!/bin/env python\n def main(): print "goodbye"\n'
+        self.FILE2_A = b'#!/bin/env python\n def main(): print "goodbye foreever"\n'
+        self.FILE3 = b'#!/bin/env python\n def main(): print "goodbye foreever"\n'
+        self.FILE4 = b'#!/bin/env python\n def main(): print "what now"\n'
+        self.FILE5 = b'Just text'
         self.CAR01 = (
-            'Some big and complicated data structure goes here, hopefully big enough that it requires chunking and compression.\n'
-            'sydney london paris port moresby okinawa st petersburg salt lake city  new york whitehorse mawson woy woy st louis\n'
+            b'Some big and complicated data structure goes here, hopefully big enough that it requires chunking and compression.\n'
+            b'sydney london paris port moresby okinawa st petersburg salt lake city  new york whitehorse mawson woy woy st louis\n'
             )
         
 
@@ -93,8 +93,8 @@ class TestTreeStore(unittest.TestCase):
 
         self.srcVariant = makeEmptyDir( os.path.join( self.workdir, 'src1-kiosk' ) )
         fs = LocalFileStore( self.srcVariant )
-        fs.put( 'kiosk-01/key', 'this is the key src1:kiosk-01' )
-        fs.put( 'kiosk-02/key', 'this is the key src1:kiosk-02' )
+        fs.put( 'kiosk-01/key', b'this is the key src1:kiosk-01' )
+        fs.put( 'kiosk-02/key', b'this is the key src1:kiosk-02' )
 
     def tearDown(self):
         shutil.rmtree( self.workdir )
@@ -111,7 +111,7 @@ class TestTreeStore(unittest.TestCase):
         pkg = treestore.findPackage( 'v1.0' )
 
         # Confirm it's in the index
-        self.assertEquals( treestore.listPackages(), ['v1.0'] )
+        self.assertEqual( treestore.listPackages(), ['v1.0'] )
 
         # Verify it
         treestore.verify( pkg )
@@ -121,7 +121,7 @@ class TestTreeStore(unittest.TestCase):
 
         # Test whether the verifyCache works
         corruptedFiles = treestore.validateLocalCache()
-        self.assertEquals( len(corruptedFiles), 0) 
+        self.assertEqual( len(corruptedFiles), 0) 
         
         # Download it, checking we get expected progress callbacks
         # The order of the callbacks will depend on the order of the
@@ -130,7 +130,7 @@ class TestTreeStore(unittest.TestCase):
         # So check independently of ordering.
         cb = CaptureDownloadProgress()
         treestore.download( pkg, cb )
-        self.assertEquals( sorted(cb.recorded), [30, 45, 47, 100, 100] )
+        self.assertEqual( sorted(cb.recorded), [30, 45, 47, 100, 100] )
 
         # Verify it locally
         treestore.verifyLocal( pkg )
@@ -140,7 +140,7 @@ class TestTreeStore(unittest.TestCase):
         treestore.install( pkg, destTree, CaptureInstallProgress() )
 
         # Check that the installed tree is the same as the source tree
-        self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
+        self.assertEqual( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
 
         # Rename the tree, and check that installing that is the same
         treestore.rename( 'v1.0', 'v1.0x' )
@@ -148,12 +148,12 @@ class TestTreeStore(unittest.TestCase):
         treestore.download( pkg, CaptureDownloadProgress() )
         destTree = os.path.join( self.workdir, 'dest-2' )
         treestore.install( pkg, destTree, CaptureInstallProgress() )
-        self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
+        self.assertEqual( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
 
         # Test the flushStore function has nothing to remove)
         treestore.upload( 'extra', '', creationTime, self.srcTree2, CaptureUploadProgress() )
         removed = treestore.flushStore()
-        self.assertEquals(len(removed), 0)
+        self.assertEqual(len(removed), 0)
 
         # Remove a tree
         treestore.remove( 'v1.0x' )
@@ -191,17 +191,18 @@ class TestTreeStore(unittest.TestCase):
         def assertExists( path ):
             self.assertTrue( os.path.exists( os.path.join(testdir, path) ) )
 
-        def assertContains( path, text ):
-            self.assertEquals( open( os.path.join(testdir, path) ).read(), text )
+        def assertContains( path, data ):
+            with open( os.path.join(testdir, path), 'rb' ) as f:
+              self.assertEqual( f.read(), data )
 
         def assertDoesntExist( path ):
             self.assertFalse( os.path.exists( os.path.join(testdir, path) ) )
 
         def assertInstalled(pkg, testdir):
             result = treestore.compareInstall(pkg, testdir)
-            self.assertEquals( result.missing, set() )
-            self.assertEquals( result.extra, set() )
-            self.assertEquals( result.diffs, set() )
+            self.assertEqual( result.missing, set() )
+            self.assertEqual( result.extra, set() )
+            self.assertEqual( result.diffs, set() )
         
         # sync a package to an empty directory
         pkg = treestore.findPackage('v1.0')
@@ -303,7 +304,8 @@ class TestTreeStore(unittest.TestCase):
         destTree = os.path.join( self.workdir, 'dest-1' )
         treestore.install(meta1p, destTree, CaptureInstallProgress() )
         def assertContains( path, text ):
-            self.assertEquals( open( os.path.join(destTree, path) ).read(), text )
+            with open( os.path.join(destTree, path), 'rb' ) as f:
+              self.assertEqual( f.read(), text )
         assertContains("dir-1/code/file1.py", self.FILE1)
         assertContains("dir-2/text/text", self.FILE5)
                 
@@ -331,7 +333,7 @@ class TestTreeStore(unittest.TestCase):
             pkg = treestore.findPackage( 'v1.0' )
 
             # Confirm it's in the index
-            self.assertEquals( treestore.listPackages(), ['v1.0'] )
+            self.assertEqual( treestore.listPackages(), ['v1.0'] )
 
             # Verify it
             treestore.verify( pkg )
@@ -339,7 +341,7 @@ class TestTreeStore(unittest.TestCase):
             # Download it, checking we get expected progress callbacks
             cb = CaptureDownloadProgress()
             treestore.download( pkg, cb )
-            self.assertEquals( sorted(cb.recorded), [30, 45, 47, 100, 100] )
+            self.assertEqual( sorted(cb.recorded), [30, 45, 47, 100, 100] )
 
             # Verify it locally
             treestore.verifyLocal( pkg )
@@ -349,15 +351,15 @@ class TestTreeStore(unittest.TestCase):
             treestore.install( pkg, destTree, CaptureInstallProgress() )
 
             # Check that the installed tree is the same as the source tree
-            self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
-            self.assertEquals( readInstallProperties(destTree).treeName, 'v1.0' )
+            self.assertEqual( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
+            self.assertEqual( readInstallProperties(destTree).treeName, 'v1.0' )
 
             # Use the compareInstall function to confirm the installed package is ok, and
             # then check that modifying the files show up in the comparison
             result = treestore.compareInstall( pkg, destTree )
-            self.assertEquals( len(result.missing), 0 )
-            self.assertEquals( len(result.extra), 0 )
-            self.assertEquals( len(result.diffs), 0 )
+            self.assertEqual( len(result.missing), 0 )
+            self.assertEqual( len(result.extra), 0 )
+            self.assertEqual( len(result.diffs), 0 )
 
             with open( os.path.join(destTree,"code/file1.py"), "w" ) as f:
                 f.write("x")
@@ -366,24 +368,24 @@ class TestTreeStore(unittest.TestCase):
             os.unlink(os.path.join(destTree,'assets/car-01.db'))
             
             result = treestore.compareInstall( pkg, destTree )
-            self.assertEquals( result.missing, set(['assets/car-01.db']) )
-            self.assertEquals( result.extra, set(['code/file3.py']) )
-            self.assertEquals( result.diffs, set(['code/file1.py']) )
+            self.assertEqual( result.missing, set(['assets/car-01.db']) )
+            self.assertEqual( result.extra, set(['code/file3.py']) )
+            self.assertEqual( result.diffs, set(['code/file1.py']) )
 
             # Reinstall to fix directory content
             shutil.rmtree( destTree )
             treestore.install( pkg, destTree, CaptureInstallProgress() )
             result = treestore.compareInstall( pkg, destTree )
-            self.assertEquals( len(result.missing), 0 )
-            self.assertEquals( len(result.extra), 0 )
-            self.assertEquals( len(result.diffs), 0 )
+            self.assertEqual( len(result.missing), 0 )
+            self.assertEqual( len(result.extra), 0 )
+            self.assertEqual( len(result.diffs), 0 )
 
             # Now create a pre-signed version of the package
             pkg = treestore.findPackage( 'v1.0' )
             treestore.addUrls( pkg, 3600 )
-            self.assertEquals( len(result.missing), 0 )
-            self.assertEquals( len(result.extra), 0 )
-            self.assertEquals( len(result.diffs), 0 )
+            self.assertEqual( len(result.missing), 0 )
+            self.assertEqual( len(result.extra), 0 )
+            self.assertEqual( len(result.diffs), 0 )
 
             # And download it directly via http. Create a new local cache
             # to ensure that we actually redownload each chunk
@@ -391,14 +393,14 @@ class TestTreeStore(unittest.TestCase):
             treestore2 = TreeStore.forHttpOnly( localCache )
             cb = CaptureDownloadProgress()
             treestore2.downloadHttp( pkg, cb )
-            self.assertEquals( sorted(cb.recorded), [30, 45, 47, 100, 100] )
+            self.assertEqual( sorted(cb.recorded), [30, 45, 47, 100, 100] )
 
             # Install it
             destTree2 = os.path.join( self.workdir, 'dest-2' )
             treestore2.install( pkg, destTree2, CaptureInstallProgress() )
 
             # Check that the new installed tree is the same as the source tree
-            self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree2), shell=True ), 0 )
+            self.assertEqual( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree2), shell=True ), 0 )
 
             # Rename the tree, and check that installing that is the same
             treestore.rename( 'v1.0', 'v1.0x' )
@@ -406,7 +408,7 @@ class TestTreeStore(unittest.TestCase):
             treestore.download( pkg, CaptureDownloadProgress() )
             destTree = os.path.join( self.workdir, 'dest-3' )
             treestore.install( pkg, destTree, CaptureInstallProgress() )
-            self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
+            self.assertEqual( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree,destTree), shell=True ), 0 )
 
             # Remove the tree
             treestore.remove( 'v1.0x' )
@@ -435,8 +437,8 @@ class TestTreeStore(unittest.TestCase):
             treestore2.upload( 'release', '', creationTime, self.srcTree2, CaptureUploadProgress() )
             pkg1 = treestore1.findPackage( 'release' )
             pkg2 = treestore2.findPackage( 'release' )
-            self.assertEquals(len(pkg1.files),3)
-            self.assertEquals(len(pkg2.files),4)
+            self.assertEqual(len(pkg1.files),3)
+            self.assertEqual(len(pkg2.files),4)
 
     def test_s3_merged_package(self):
         # Test the creation and subsequent installation of merged packages
@@ -467,7 +469,7 @@ class TestTreeStore(unittest.TestCase):
             def assertSameContent( path1, path2 ):
                 with open(path1) as f1:
                     with open(path2) as f2:
-                        self.assertEquals( f1.read(), f2.read() )
+                        self.assertEqual( f1.read(), f2.read() )
 
             assertSameContent(os.path.join(destTree, "code/file1.py"), os.path.join(self.srcTree, "code/file1.py"))
             assertSameContent(os.path.join(destTree, "subdir-a/code/file4.py"), os.path.join(self.srcTree2, "code/file4.py"))
@@ -497,7 +499,7 @@ class TestTreeStore(unittest.TestCase):
             pkg = treestore.findPackage( 'v1.0:kiosk-01' )
 
             # Confirm it's in the index
-            self.assertEquals( treestore.listPackages(), ['v1.0:kiosk-01', 'v1.0:kiosk-02'] )
+            self.assertEqual( treestore.listPackages(), ['v1.0:kiosk-01', 'v1.0:kiosk-02'] )
 
             # Verify it
             treestore.verify( pkg )
@@ -505,7 +507,7 @@ class TestTreeStore(unittest.TestCase):
             # Download it, checking we get expected progress callbacks
             cb = CaptureDownloadProgress()
             treestore.download( pkg, cb )
-            self.assertEquals( sorted(cb.recorded), [29, 30, 45, 47, 100, 100] )
+            self.assertEqual( sorted(cb.recorded), [29, 30, 45, 47, 100, 100] )
 
             # Verify it locally
             treestore.verifyLocal( pkg )
@@ -515,11 +517,11 @@ class TestTreeStore(unittest.TestCase):
             treestore.install( pkg, destTree, CaptureInstallProgress() )
 
             # Check that the installed tree is the same as the source tree
-            self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree + '/assets',destTree + '/assets'), shell=True ), 0 )
-            self.assertEquals( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree + '/code',destTree + '/code'), shell=True ), 0 )
+            self.assertEqual( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree + '/assets',destTree + '/assets'), shell=True ), 0 )
+            self.assertEqual( subprocess.call( 'diff -r -x {0} {1} {2}'.format(S3TS_PROPERTIES,self.srcTree + '/code',destTree + '/code'), shell=True ), 0 )
 
 
-            self.assertEquals( readInstallProperties(destTree).treeName, 'v1.0:kiosk-01' )
+            self.assertEqual( readInstallProperties(destTree).treeName, 'v1.0:kiosk-01' )
 
 
 

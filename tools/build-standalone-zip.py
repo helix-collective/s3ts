@@ -26,6 +26,6 @@ def addFilesToZip( zf, dir, matcher=None, arcname=None ):
 s3tsPythonZip = os.path.join( BASE_DIR, 'dist/s3ts.zip' )
 zf = newZipFile( s3tsPythonZip )
 addFilesToZip( zf, os.path.join( BASE_DIR, 'src' ), lambda f:f.endswith('.py') )
-addFilesToZip( zf, os.path.join( BASE_DIR, 'python-venv/lib/python2.7/site-packages/boto' ), lambda f:f.endswith('.py'), 'boto' )
-addFilesToZip( zf, os.path.join( BASE_DIR, 'python-venv/lib/python2.7/site-packages/requests' ), lambda f:f.endswith('.py'), 'requests' )
+addFilesToZip( zf, os.path.join( BASE_DIR, 'python-venv/lib/python3.9/site-packages/boto' ), lambda f:f.endswith('.py'), 'boto' )
+addFilesToZip( zf, os.path.join( BASE_DIR, 'python-venv/lib/python3.9/site-packages/requests' ), lambda f:f.endswith('.py'), 'requests' )
 zf.close()

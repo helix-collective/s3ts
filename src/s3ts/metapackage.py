@@ -123,9 +123,9 @@ class ComponentJS(object):
         self.localizedPackageJS = LocalizedPackageJS()
 
     def fromJson( self, jv ):
-        if jv.has_key('subPackage'):
+        if 'subPackage' in jv:
             return self.subPackageJS.fromJson( jv['subPackage'] )
-        elif jv.has_key('localizedPackage'):
+        elif 'localizedPackage' in jv:
             return self.localizedPackageJS.fromJson( jv['localizedPackage'] )
         else:
             raise RuntimeError("invalid metapackage component")

@@ -33,10 +33,10 @@ class FileStore(object):
         raise RuntimeError("Not implemented")
 
     def getFromJson( self, path, jscoder ):
-        return jscoder.fromJson( json.loads( self.get(path) ) )
+        return jscoder.fromJson( json.loads( self.get(path).decode() ) )
 
     def putToJson( self, path, v, jscoder ):
-        return self.put( path, json.dumps( jscoder.toJson(v) ) )
+        return self.put( path, json.dumps( jscoder.toJson(v) ).encode() )
 
     def url( self, path, expiresInSecs ):
         raise RuntimeError("Not implemented")

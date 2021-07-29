@@ -10,7 +10,7 @@ rm -rf $TEST_DIR
 export S3TS_LOCALCACHE=$TEST_DIR/cache
 
 s3ts() {
-    PYTHONPATH=src python src/s3ts/main.py "$@"
+    PYTHONPATH=src python-venv/bin/python src/s3ts/main.py "$@"
 }
 
 s3ts init
