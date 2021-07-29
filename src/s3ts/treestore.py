@@ -308,7 +308,7 @@ class TreeStore(object):
         
         # 1) check that the list of files installed matches the list in the package
         installedFiles = []
-        for root, dirs, files in os.walk(localPath):
+        for root, dirs, files in os.walk(localPath, followlinks=True):
             for file in files:
                 installedFiles.append(os.path.relpath( os.path.join(root, file), localPath ))
         installedFiles = set(installedFiles)
